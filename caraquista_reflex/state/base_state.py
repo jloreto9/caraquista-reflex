@@ -63,6 +63,13 @@ class AppState(rx.State):
                 t_id = int(row.get('team_id', 0))
                 team_name = str(row.get('team_name', 'Equipo'))
                 t_logo = get_team_logo(t_id if t_id > 0 else team_name, size=72)
+                is_leones = (t_id == 695 or "Leones" in team_name)
+                streak_str = str(row.get('streak', '-'))
+                diff_val = int(row.get('run_differential', 0))
+                diff_str = f"{diff_val:+d}"
+                
+                streak_color = "green" if "G" in streak_str else ("red" if "P" in streak_str else "gray")
+                diff_color = "var(--green-9)" if diff_val > 0 else ("var(--red-9)" if diff_val < 0 else "var(--gray-9)")
                 
                 records.append({
                     "pos": int(row.get('pos', 1)),
@@ -75,18 +82,24 @@ class AppState(rx.State):
                     "losses": int(row.get('losses', 0)),
                     "pct": f"{float(row.get('win_pct', 0.0)):.3f}".replace("0.", "."),
                     "gb": str(row.get('games_behind', '-')),
-                    "streak": str(row.get('streak', '-')),
+                    "streak": streak_str,
+                    "streak_color": streak_color,
                     "l10": str(row.get('last_10', '-')),
                     "home": str(row.get('home_record', '-')),
                     "away": str(row.get('away_record', '-')),
                     "rs": int(row.get('runs_scored', 0)),
                     "ra": int(row.get('runs_against', 0)),
-                    "diff": f"{int(row.get('run_differential', 0)):+d}"
+                    "diff": diff_str,
+                    "diff_color": diff_color,
+                    "is_leones": is_leones,
+                    "row_bg": "rgba(253, 184, 39, 0.08)" if is_leones else "transparent",
+                    "row_border": "3px solid #FDB827" if is_leones else "none",
+                    "text_color": "#FDB827" if is_leones else "#FFFFFF"
                 })
             self.standings_data = records
             
             # Extraer KPIs de Leones (ID 695)
-            leones_row = next((r for r in records if r["team_id"] == 695 or "Leones" in r["team_name"]), None)
+            leones_row = next((r for r in records if r["is_leones"]), None)
             if leones_row:
                 self.leones_kpis = {
                     "posicion": f"{leones_row['pos']}°",
@@ -123,6 +136,7 @@ class AppState(rx.State):
                     "away_score": a_score,
                     "score_str": f"{a_score} - {h_score}",
                     "result_badge": "Victoria" if leones_won else "Derrota",
+                    "result_color": "green" if leones_won else "red",
                     "is_win": leones_won
                 })
             self.recent_games_data = g_records
@@ -130,4 +144,16 @@ class AppState(rx.State):
                 self.last_game_data = g_records[0]
         else:
             self.recent_games_data = []
-            self.last_game_data = {}
+            self.last_game_data = {
+                "date": "-",
+                "home_name": "Leones del Caracas",
+                "away_name": "Rival",
+                "home_logo": get_team_logo(695, size=72),
+                "away_logo": get_team_logo(696, size=72),
+                "home_score": 0,
+                "away_score": 0,
+                "score_str": "0 - 0",
+                "result_badge": "Sin juegos",
+                "result_color": "gray",
+                "is_win": True
+            }

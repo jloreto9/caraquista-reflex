@@ -56,7 +56,7 @@ def navbar() -> rx.Component:
                 ),
                 rx.link(
                     rx.button(
-                        rx.icon("github", size=16),
+                        rx.icon("git-branch", size=16),
                         "GitHub",
                         size="2",
                         variant="outline",

@@ -7,18 +7,16 @@ from caraquista_reflex.state.base_state import AppState
 
 def standings_row(team: dict) -> rx.Component:
     """Fila de la tabla de posiciones con estilo condicional para Leones."""
-    is_leones = team["team_id"] == 695
-    
     return rx.table.row(
         # Posición
         rx.table.cell(
-            rx.text(f"{team['pos']}°", font_weight="700", color=rx.cond(is_leones, ACCENT_GOLD, TEXT_PRIMARY))
+            rx.text(team["pos"].to_string() + "°", font_weight="700", color=team["text_color"])
         ),
         # Equipo con Logo Oficial
         rx.table.cell(
             rx.hstack(
                 rx.image(src=team["logo"], width="28px", height="28px"),
-                rx.text(team["team_name"], font_weight=rx.cond(is_leones, "800", "600"), color=rx.cond(is_leones, ACCENT_GOLD, TEXT_PRIMARY)),
+                rx.text(team["team_name"], font_weight="700", color=team["text_color"]),
                 align="center",
                 spacing="2"
             )
@@ -30,14 +28,14 @@ def standings_row(team: dict) -> rx.Component:
         # P
         rx.table.cell(rx.text(team["losses"], font_weight="700", color="var(--red-9)", text_align="center")),
         # PCT
-        rx.table.cell(rx.text(team["pct"], font_weight="700", color=rx.cond(is_leones, ACCENT_GOLD, TEXT_PRIMARY), text_align="center")),
+        rx.table.cell(rx.text(team["pct"], font_weight="700", color=team["text_color"], text_align="center")),
         # GB (DIF)
         rx.table.cell(rx.text(team["gb"], color=TEXT_MUTED, text_align="center")),
         # Racha
         rx.table.cell(
             rx.badge(
                 team["streak"],
-                color_scheme=rx.cond(team["streak"].contains("G"), "green", "red"),
+                color_scheme=team["streak_color"],
                 variant="soft",
                 size="1"
             )
@@ -49,12 +47,12 @@ def standings_row(team: dict) -> rx.Component:
             rx.text(
                 team["diff"],
                 font_weight="700",
-                color=rx.cond(team["diff"].contains("+"), "var(--green-9)", "var(--red-9)"),
+                color=team["diff_color"],
                 text_align="center"
             )
         ),
-        background=rx.cond(is_leones, "rgba(253, 184, 39, 0.08)", "transparent"),
-        border_left=rx.cond(is_leones, f"3px solid {ACCENT_GOLD}", "none")
+        background=team["row_bg"],
+        border_left=team["row_border"]
     )
 
 def standings_table() -> rx.Component:

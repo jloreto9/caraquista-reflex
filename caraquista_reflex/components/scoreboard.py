@@ -20,7 +20,7 @@ def scoreboard_card() -> rx.Component:
                 rx.spacer(),
                 rx.badge(
                     AppState.last_game_data["result_badge"],
-                    color_scheme=rx.cond(AppState.last_game_data["is_win"], "green", "red"),
+                    color_scheme=AppState.last_game_data["result_color"],
                     variant="solid",
                     size="2"
                 ),

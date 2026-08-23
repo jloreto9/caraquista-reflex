@@ -30,7 +30,7 @@ def recent_game_item(game: dict) -> rx.Component:
         ),
         rx.badge(
             game["result_badge"],
-            color_scheme=rx.cond(game["is_win"], "green", "red"),
+            color_scheme=game["result_color"],
             variant="soft",
             size="1"
         ),
