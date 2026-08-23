@@ -1,9 +1,9 @@
-# caraquista_reflex/components/kpi_grid.py
+# republicaraquistapp/components/kpi_grid.py
 import reflex as rx
-from caraquista_reflex.styles.theme import (
+from republicaraquistapp.styles.theme import (
     CARD_STYLE, ACCENT_GOLD, TEXT_PRIMARY, TEXT_MUTED, BORDER_SUBTLE
 )
-from caraquista_reflex.state.base_state import AppState
+from republicaraquistapp.state.base_state import AppState
 
 def kpi_card(title: str, value: str, subtitle: str, icon_name: str, badge_text: str = None) -> rx.Component:
     """Tarjeta KPI moderna con acento caraquista."""

@@ -8,3 +8,5 @@ assets/external/
 .env.local
 !.env.example
 .venv/
+*.zip
+

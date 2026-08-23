@@ -1,8 +1,8 @@
-# caraquista_reflex/caraquista_reflex.py
+# republicaraquistapp/republicaraquistapp.py
 import reflex as rx
 from rxconfig import config
-from caraquista_reflex.state.base_state import AppState
-from caraquista_reflex.pages.index import index
+from republicaraquistapp.state.base_state import AppState
+from republicaraquistapp.pages.index import index
 
 app = rx.App(
     head_components=[

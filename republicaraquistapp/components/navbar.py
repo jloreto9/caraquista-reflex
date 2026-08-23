@@ -1,9 +1,9 @@
-# caraquista_reflex/components/navbar.py
+# republicaraquistapp/components/navbar.py
 import reflex as rx
-from caraquista_reflex.styles.theme import (
+from republicaraquistapp.styles.theme import (
     BG_DARK, CARD_BG, ACCENT_GOLD, TEXT_PRIMARY, TEXT_MUTED, BORDER_CARD, GOLD_BADGE_STYLE
 )
-from caraquista_reflex.state.base_state import AppState
+from republicaraquistapp.state.base_state import AppState
 
 def navbar() -> rx.Component:
     """Barra de navegación principal con look premium glassmorphism."""

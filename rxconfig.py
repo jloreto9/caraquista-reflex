@@ -1,7 +1,7 @@
 import reflex as rx
 
 config = rx.Config(
-    app_name="caraquista_reflex",
+    app_name="republicaraquistapp",
     plugins=[
         rx.plugins.SitemapPlugin(),
         rx.plugins.TailwindV4Plugin(),

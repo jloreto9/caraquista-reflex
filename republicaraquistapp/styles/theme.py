@@ -1,4 +1,4 @@
-# caraquista_reflex/styles/theme.py
+# republicaraquistapp/styles/theme.py
 import reflex as rx
 
 # Paleta de Colores Oficial República Caraquista

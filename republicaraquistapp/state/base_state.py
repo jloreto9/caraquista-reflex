@@ -1,4 +1,4 @@
-# caraquista_reflex/state/base_state.py
+# republicaraquistapp/state/base_state.py
 import reflex as rx
 import pandas as pd
 from core.supabase_client import (

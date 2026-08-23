@@ -1,9 +1,9 @@
-# caraquista_reflex/components/standings_table.py
+# republicaraquistapp/components/standings_table.py
 import reflex as rx
-from caraquista_reflex.styles.theme import (
+from republicaraquistapp.styles.theme import (
     CARD_STYLE, ACCENT_GOLD, TEXT_PRIMARY, TEXT_MUTED, BORDER_CARD
 )
-from caraquista_reflex.state.base_state import AppState
+from republicaraquistapp.state.base_state import AppState
 
 def standings_row(team: dict) -> rx.Component:
     """Fila de la tabla de posiciones con estilo condicional para Leones."""

@@ -1,13 +1,13 @@
-# caraquista_reflex/pages/index.py
+# republicaraquistapp/pages/index.py
 import reflex as rx
-from caraquista_reflex.styles.theme import (
+from republicaraquistapp.styles.theme import (
     BG_DARK, ACCENT_GOLD, TEXT_PRIMARY, TEXT_MUTED, BORDER_CARD, CARD_STYLE
 )
-from caraquista_reflex.state.base_state import AppState
-from caraquista_reflex.components.navbar import navbar
-from caraquista_reflex.components.kpi_grid import kpi_grid
-from caraquista_reflex.components.scoreboard import scoreboard_card
-from caraquista_reflex.components.standings_table import standings_table
+from republicaraquistapp.state.base_state import AppState
+from republicaraquistapp.components.navbar import navbar
+from republicaraquistapp.components.kpi_grid import kpi_grid
+from republicaraquistapp.components.scoreboard import scoreboard_card
+from republicaraquistapp.components.standings_table import standings_table
 
 def recent_game_item(game: dict) -> rx.Component:
     """Elemento individual de la lista de juegos recientes."""

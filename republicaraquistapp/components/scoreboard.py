@@ -1,9 +1,9 @@
-# caraquista_reflex/components/scoreboard.py
+# republicaraquistapp/components/scoreboard.py
 import reflex as rx
-from caraquista_reflex.styles.theme import (
+from republicaraquistapp.styles.theme import (
     CARD_STYLE, ACCENT_GOLD, TEXT_PRIMARY, TEXT_MUTED, BORDER_CARD, BORDER_SUBTLE
 )
-from caraquista_reflex.state.base_state import AppState
+from republicaraquistapp.state.base_state import AppState
 
 def scoreboard_card() -> rx.Component:
     """Tarjeta de Último Juego de los Leones del Caracas."""
