@@ -110,7 +110,7 @@ def index() -> rx.Component:
             rx.vstack(
                 rx.divider(color=BORDER_CARD),
                 rx.hstack(
-                    rx.text("Desarrollado por Jorge Leonardo Loreto • Científico de Datos & Analista Sabermétrico", size="1", color=TEXT_MUTED),
+                    rx.text("Desarrollado por Jorge Leonardo Loreto • AI Data Scientist & Analista Sabermétrico", size="1", color=TEXT_MUTED),
                     rx.spacer(),
                     rx.text("Powered by Reflex, FastAPI & Supabase", size="1", color=TEXT_MUTED),
                     width="100%",

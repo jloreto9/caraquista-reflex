@@ -110,6 +110,6 @@ La aplicación se compilará y estará disponible en `http://localhost:3000` (Fr
 ## 👤 Autor
 
 **Jorge Leonardo Loreto**  
-*Científico de Datos & Economista*  
+*Economista & AI Data Scientist*  
 - Twitter: [@JorgeLoreto](https://twitter.com/JorgeLoreto) / [@RepubCaraquista](https://twitter.com/RepubCaraquista)  
 - GitHub: [@jloreto9](https://github.com/jloreto9)
