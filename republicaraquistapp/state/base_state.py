@@ -43,6 +43,42 @@ def safe_str(val, default: str = "-") -> str:
     return str(val)
 
 
+def extract_team_info(team_val, team_id_val=None) -> tuple[str, str, int]:
+    """Extrae de forma robusta (team_name, team_abbr, team_id) tanto si viene dict, string o id."""
+    t_id = 0
+    name = "Equipo"
+    abbr = ""
+
+    if isinstance(team_val, dict):
+        name = str(team_val.get("name", "Equipo"))
+        abbr = str(team_val.get("abbreviation", ""))
+        t_id = safe_int(team_val.get("id", 0))
+    elif isinstance(team_val, str):
+        s = team_val.strip()
+        if s.startswith("{") and "name" in s:
+            try:
+                import ast
+                d = ast.literal_eval(s)
+                if isinstance(d, dict):
+                    name = str(d.get("name", "Equipo"))
+                    abbr = str(d.get("abbreviation", ""))
+                    t_id = safe_int(d.get("id", 0))
+                else:
+                    name = s
+            except:
+                name = s
+        else:
+            name = s
+
+    if not t_id and team_id_val is not None:
+        t_id = safe_int(team_id_val)
+
+    if not abbr:
+        abbr = get_team_abbr(t_id if t_id > 0 else name)
+
+    return name, abbr, t_id
+
+
 class AppState(rx.State):
     """Estado global y reactivo principal de República Caraquista."""
 
@@ -191,45 +227,63 @@ class AppState(rx.State):
             df_standings = get_standings(self.selected_season, phase="regular")
             if df_standings is not None and not df_standings.empty:
                 records = []
-                for _, row in df_standings.iterrows():
+                sort_col = "pct" if "pct" in df_standings.columns else ("win_pct" if "win_pct" in df_standings.columns else "wins")
+                df_sorted = df_standings.sort_values(sort_col, ascending=False).reset_index(drop=True)
+
+                for idx, row in df_sorted.iterrows():
                     t_id = safe_int(row.get("team_id", 0))
                     team_name = safe_str(row.get("team_name", "Equipo"))
                     t_logo = get_team_logo(t_id if t_id > 0 else team_name, size=72)
                     is_leones = (t_id == 695 or "Leones" in team_name)
                     streak_str = safe_str(row.get("streak", "-"))
-                    diff_val = safe_int(row.get("run_differential", 0))
-                    diff_str = f"{diff_val:+d}"
+
+                    wins = safe_int(row.get("wins", 0))
+                    losses = safe_int(row.get("losses", 0))
+                    games_played = safe_int(row.get("games_played", row.get("games", wins + losses)))
+                    if games_played == 0 and (wins + losses > 0):
+                        games_played = wins + losses
+
+                    pct_val = safe_float(row.get("pct", row.get("win_pct", (wins / games_played if games_played > 0 else 0.0))))
+                    pct_str = f"{pct_val:.3f}".replace("0.", ".") if pct_val < 1.0 else "1.000"
+
+                    rf_val = safe_int(row.get("runs_for", row.get("runs_scored", row.get("rs", 0))))
+                    ra_val = safe_int(row.get("runs_against", row.get("ra", 0)))
+                    diff_val = safe_int(row.get("run_diff", row.get("run_differential", row.get("diff", rf_val - ra_val))))
+                    diff_str = f"{diff_val:+d}" if diff_val != 0 else "0"
+
+                    gb_val = row.get("games_back", row.get("games_behind", row.get("gb", "-")))
+                    gb_str = "-" if str(gb_val) in ["0", "0.0", "-"] else str(gb_val)
 
                     streak_color = (
-                        "green" if "G" in streak_str
-                        else ("red" if "P" in streak_str else "gray")
+                        "green" if "G" in streak_str or "W" in streak_str
+                        else ("red" if "P" in streak_str or "L" in streak_str else "gray")
                     )
                     diff_color = (
                         "var(--green-9)" if diff_val > 0
                         else ("var(--red-9)" if diff_val < 0 else "var(--gray-9)")
                     )
 
-                    pct_val = safe_float(row.get("win_pct", 0.0))
-                    pct_str = f"{pct_val:.3f}".replace("0.", ".")
-
                     records.append({
-                        "pos": safe_int(row.get("pos", 1)),
+                        "pos": idx + 1,
+                        "pos_str": f"{idx + 1}°",
                         "team_id": t_id,
                         "team_name": team_name,
                         "team_abbr": get_team_abbr(t_id if t_id > 0 else team_name),
                         "logo": t_logo,
-                        "games": safe_int(row.get("games_played", 0)),
-                        "wins": safe_int(row.get("wins", 0)),
-                        "losses": safe_int(row.get("losses", 0)),
+                        "games": games_played,
+                        "wins": wins,
+                        "losses": losses,
                         "pct": pct_str,
-                        "gb": safe_str(row.get("games_behind", "-")),
+                        "pct_float": pct_val,
+                        "gb": gb_str,
                         "streak": streak_str,
                         "streak_color": streak_color,
                         "l10": safe_str(row.get("last_10", "-")),
                         "home": safe_str(row.get("home_record", "-")),
                         "away": safe_str(row.get("away_record", "-")),
-                        "rs": safe_int(row.get("runs_scored", 0)),
-                        "ra": safe_int(row.get("runs_against", 0)),
+                        "rs": rf_val,
+                        "ra": ra_val,
+                        "rf": rf_val,
                         "diff": diff_str,
                         "diff_color": diff_color,
                         "is_leones": is_leones,
@@ -249,6 +303,9 @@ class AppState(rx.State):
                         "streak": leones_row["streak"],
                         "l10": leones_row["l10"],
                         "run_diff": leones_row["diff"],
+                        "rf": str(leones_row["rs"]),
+                        "ra": str(leones_row["ra"]),
+                        "gb": leones_row["gb"],
                     }
             else:
                 self.standings_data = []
@@ -258,24 +315,24 @@ class AppState(rx.State):
             if recent is not None and not recent.empty:
                 g_records = []
                 for _, g in recent.iterrows():
-                    h_name = safe_str(g.get("home_team", "Home"))
-                    a_name = safe_str(g.get("away_team", "Away"))
-                    h_id = safe_int(g.get("home_team_id", 0))
-                    a_id = safe_int(g.get("away_team_id", 0))
+                    h_name, h_abbr, h_id = extract_team_info(g.get("home_team"), g.get("home_team_id"))
+                    a_name, a_abbr, a_id = extract_team_info(g.get("away_team"), g.get("away_team_id"))
                     h_score = safe_int(g.get("home_score", 0))
                     a_score = safe_int(g.get("away_score", 0))
                     is_leones_home = ("Leones" in h_name or h_id == 695)
                     leones_won = (h_score > a_score) if is_leones_home else (a_score > h_score)
 
                     g_records.append({
-                        "date": safe_str(g.get("game_date", "")),
+                        "date": safe_str(g.get("game_date", ""))[:10],
                         "home_name": h_name,
                         "away_name": a_name,
+                        "home_abbr": h_abbr,
+                        "away_abbr": a_abbr,
                         "home_logo": get_team_logo(h_id if h_id else h_name, size=72),
                         "away_logo": get_team_logo(a_id if a_id else a_name, size=72),
                         "home_score": h_score,
                         "away_score": a_score,
-                        "score_str": f"{a_score} - {h_score}",
+                        "score_str": f"{h_score} - {a_score}",
                         "result_badge": "Victoria" if leones_won else "Derrota",
                         "result_color": "green" if leones_won else "red",
                         "is_win": leones_won,

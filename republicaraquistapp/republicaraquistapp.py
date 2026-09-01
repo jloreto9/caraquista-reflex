@@ -44,7 +44,7 @@ app.add_page(
     route="/",
     title="República Caraquista • Analítica Sabermétrica LVBP",
     image="/logo.png",
-    on_load=AppState.on_load
+    on_load=StandingsState.on_load
 )
 
 # ── 2. Ruta /standings (Posiciones & ELO) ────────────────────────────────────

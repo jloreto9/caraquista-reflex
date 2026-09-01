@@ -17,7 +17,13 @@ import reflex as rx
 import pandas as pd
 import numpy as np
 
-from republicaraquistapp.state.base_state import AppState
+from republicaraquistapp.state.base_state import (
+    AppState,
+    extract_team_info,
+    safe_int,
+    safe_float,
+    safe_str,
+)
 from core.supabase_client import (
     get_available_seasons,
     get_current_season,
@@ -740,24 +746,24 @@ class StandingsState(AppState):
         g_records = []
         if recent is not None and not recent.empty:
             for _, g in recent.iterrows():
-                h_name = str(g.get("home_team", "Home"))
-                a_name = str(g.get("away_team", "Away"))
-                h_id = g.get("home_team_id", 0)
-                a_id = g.get("away_team_id", 0)
-                h_score = int(g.get("home_score", 0))
-                a_score = int(g.get("away_score", 0))
+                h_name, h_abbr, h_id = extract_team_info(g.get("home_team"), g.get("home_team_id"))
+                a_name, a_abbr, a_id = extract_team_info(g.get("away_team"), g.get("away_team_id"))
+                h_score = safe_int(g.get("home_score", 0))
+                a_score = safe_int(g.get("away_score", 0))
                 is_leones_home = ("Leones" in h_name or h_id == 695)
                 leones_won = (h_score > a_score) if is_leones_home else (a_score > h_score)
 
                 g_records.append({
-                    "date": str(g.get("game_date", ""))[:10],
+                    "date": safe_str(g.get("game_date", ""))[:10],
                     "home_name": h_name,
                     "away_name": a_name,
+                    "home_abbr": h_abbr,
+                    "away_abbr": a_abbr,
                     "home_logo": get_team_logo(h_id if h_id else h_name, size=72),
                     "away_logo": get_team_logo(a_id if a_id else a_name, size=72),
                     "home_score": h_score,
                     "away_score": a_score,
-                    "score_str": f"{a_score} - {h_score}",
+                    "score_str": f"{h_score} - {a_score}",
                     "result_badge": "Victoria" if leones_won else "Derrota",
                     "result_color": "green" if leones_won else "red",
                     "is_win": leones_won,
