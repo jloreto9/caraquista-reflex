@@ -1,0 +1,26 @@
+﻿version: "3.7"
+
+services:
+  caraquista-reflex:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: caraquista-reflex
+    restart: always
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    networks:
+      - root_default
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.caraquista.rule=Host(`caraquista.srv929207.hstgr.cloud`)"
+      - "traefik.http.routers.caraquista.tls=true"
+      - "traefik.http.routers.caraquista.entrypoints=web,websecure"
+      - "traefik.http.routers.caraquista.tls.certresolver=mytlschallenge"
+      - "traefik.http.services.caraquista.loadbalancer.server.port=3000"
+
+networks:
+  root_default:
+    external: true

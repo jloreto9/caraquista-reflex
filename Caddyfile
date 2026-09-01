@@ -1,0 +1,10 @@
+﻿:3000 {
+    root * /app/.web/build/client
+    encode gzip zstd
+    file_server
+
+    @backend path /_event* /ping* /_upload* /api*
+    reverse_proxy @backend 127.0.0.1:8000
+
+    try_files {path} /__spa-fallback.html /index.html
+}
