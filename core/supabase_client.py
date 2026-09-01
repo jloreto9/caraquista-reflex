@@ -479,18 +479,20 @@ def get_leones_advanced_stats(season=None, cache_version="v4_terreneadas_fixed")
         return {}
    
 @cache_ttl(ttl_seconds=600)
-def get_recent_games(team_id=695, limit=10):
+def get_recent_games(team_id=695, limit=10, season=None):
     """Obtiene los últimos juegos del equipo"""
     supabase = init_supabase()
     
     try:
-        response = supabase.table('games') \
+        query = supabase.table('games') \
             .select('*, home_team:teams!games_home_team_id_fkey(name, abbreviation), away_team:teams!games_away_team_id_fkey(name, abbreviation)') \
             .or_(f'home_team_id.eq.{team_id},away_team_id.eq.{team_id}') \
-            .eq('status', 'Final') \
-            .order('game_date', desc=True) \
-            .limit(limit) \
-            .execute()
+            .eq('status', 'Final')
+            
+        if season is not None:
+            query = query.eq('season', season)
+            
+        response = query.order('game_date', desc=True).limit(limit).execute()
         
         return pd.DataFrame(response.data) if response.data else pd.DataFrame()
     except:
