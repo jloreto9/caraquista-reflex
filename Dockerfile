@@ -39,7 +39,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     caddy \
     curl \
     ca-certificates \
-    dos2unix \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy installed Python environment from builder
@@ -49,13 +48,11 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # Copy app code, core modules, and built web assets
 COPY --from=builder /app /app
 
-# Copy Caddy reverse proxy config and entrypoint
+# Copy Caddy reverse proxy config
 COPY Caddyfile /etc/caddy/Caddyfile
-COPY entrypoint.sh /app/entrypoint.sh
-RUN sed -i 's/\r$//' /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 EXPOSE 3000
 
 ENV PYTHONUNBUFFERED=1
 
-CMD ["/app/entrypoint.sh"]
+CMD ["sh", "-c", "echo 'Iniciando backend Reflex...' && reflex run --backend-only --backend-port 8000 --env prod & echo 'Iniciando Caddy proxy en puerto 3000...' && exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile"]
