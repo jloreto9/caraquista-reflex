@@ -31,20 +31,37 @@ AVG_RUNS_PER_INNING = 0.50
 VAR_PER_INNING = 1.25
 
 
+BASE_STATE_MAP = {
+    (False, False, False): 0,  # ---
+    (True, False, False): 1,   # 1--
+    (False, True, False): 2,   # -2-
+    (False, False, True): 3,   # --3
+    (True, True, False): 4,    # 12-
+    (True, False, True): 5,    # 1-3
+    (False, True, True): 6,    # -23
+    (True, True, True): 7,     # 123
+}
+
+BASE_STATE_DIAMONDS = {
+    0: ("◇", "◇", "◇"),  # ---
+    1: ("◇", "◇", "◆"),  # 1--
+    2: ("◇", "◆", "◇"),  # -2-
+    3: ("◆", "◇", "◇"),  # --3
+    4: ("◇", "◆", "◆"),  # 12-
+    5: ("◆", "◇", "◆"),  # 1-3
+    6: ("◆", "◆", "◇"),  # -23
+    7: ("◆", "◆", "◆"),  # 123
+}
+
+
 def encode_base_state(on_1b: bool, on_2b: bool, on_3b: bool) -> int:
-    """Codifica el estado de bases en un entero de 0 a 7"""
-    return int(bool(on_1b)) * 1 + int(bool(on_2b)) * 2 + int(bool(on_3b)) * 4
+    """Codifica el estado de bases en un entero de 0 a 7 alineado exactamente con la matriz RE24."""
+    return BASE_STATE_MAP.get((bool(on_1b), bool(on_2b), bool(on_3b)), 0)
 
 
 def format_base_state(base_state: int) -> str:
-    """Retorna representación visual de las bases (ej: '◆ ◇ ◇')"""
-    on_1b = bool(base_state & 1)
-    on_2b = bool(base_state & 2)
-    on_3b = bool(base_state & 4)
-    
-    b3 = "◆" if on_3b else "◇"
-    b2 = "◆" if on_2b else "◇"
-    b1 = "◆" if on_1b else "◇"
+    """Retorna representación visual de las bases (ej: '◆ ◇ ◇') alineada con RE24."""
+    b3, b2, b1 = BASE_STATE_DIAMONDS.get(base_state, ("◇", "◇", "◇"))
     return f"{b3} {b2} {b1}"
 
 
@@ -162,6 +179,23 @@ def calculate_leverage_index(
     
     li = delta_swing / avg_delta_swing
     return round(float(min(10.0, max(0.05, li))), 2)
+
+
+def get_leverage_index(
+    inning: int,
+    half: str,
+    outs: int,
+    base_state: int,
+    score_diff: int
+) -> float:
+    """
+    Función de conveniencia para calcular Leverage Index con formato de half (top/bottom) y diferencial.
+    score_diff = home_score - away_score
+    """
+    is_bottom = str(half).lower() in ["bottom", "bot", "b", "baja", "bottominning"]
+    home_score = max(0, score_diff)
+    away_score = max(0, -score_diff)
+    return calculate_leverage_index(inning, is_bottom, outs, base_state, home_score, away_score)
 
 
 @cache_ttl(ttl_seconds=600)
@@ -367,16 +401,23 @@ def calculate_player_game_wpa(df_wpa: pd.DataFrame, leones_player_ids: Optional[
     return merged
 
 
+def calculate_wpa_for_game(game_pk: int) -> dict:
+    """Calcula el WPA para un juego individual y retorna el DataFrame y metadatos."""
+    df_wpa, is_home, err = process_game_wpa_advanced(game_pk)
+    return {
+        "wpa_df": df_wpa,
+        "is_home": is_home,
+        "error": err
+    }
+
+
 @cache_ttl(ttl_seconds=600)
 def get_season_wpa_leaderboard(season: int = 2025) -> Dict[str, Any]:
     """
     Procesa todos los juegos de la temporada para calcular los rankings acumulados
     de WPA, WPA/LI, Clutch y las mejores jugadas de todo el año.
     """
-    try:
-        from core.supabase_client import init_supabase
-    except Exception:
-        from streamlit_app.core.supabase_client import init_supabase
+    from core.supabase_client import init_supabase
         
     supabase = init_supabase()
     games_response = supabase.table('games') \

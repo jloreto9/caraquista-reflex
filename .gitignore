@@ -9,4 +9,6 @@ assets/external/
 !.env.example
 .venv/
 *.zip
-
+.agents/
+TEST_INFRA.md
+TEST_READY.md

@@ -1,3 +1,4 @@
+from typing import Any, Dict, List, Optional, Tuple
 from core.cache import cache_ttl
 # utils/bullpen_lineups.py
 import requests
@@ -171,20 +172,63 @@ def fetch_season_bullpen_and_lineups(season: int, team_id: int = LEONES_TEAM_ID,
     return df_bullpen, lineups_all
 
 
-def compute_bullpen_inherited_stats(df_bullpen: pd.DataFrame) -> pd.DataFrame:
+class BullpenResult(pd.DataFrame):
+    """Subclase de DataFrame que también soporta acceso de diccionario para compatibilidad analítica."""
+    _metadata = ["_extra_dict"]
+
+    def __init__(self, *args, extra_dict: Optional[Dict[str, Any]] = None, **kwargs):
+        super().__init__(*args, **kwargs)
+        object.__setattr__(self, "_extra_dict", extra_dict or {})
+
+    def __getitem__(self, key):
+        if hasattr(self, "_extra_dict") and key in self._extra_dict:
+            return self._extra_dict[key]
+        return super().__getitem__(key)
+
+    def __contains__(self, key):
+        if hasattr(self, "_extra_dict") and key in self._extra_dict:
+            return True
+        return super().__contains__(key)
+
+
+def compute_bullpen_inherited_stats(df_bullpen: Any) -> BullpenResult:
     """Calcula la tabla de corredores heredados por lanzador del bullpen."""
+    empty_df = pd.DataFrame()
+    empty_res = BullpenResult(empty_df, extra_dict={
+        "summary_df": empty_df,
+        "detailed_df": empty_df,
+        "total_ir": 0,
+        "total_irs": 0,
+        "irs_pct": 0.0,
+    })
+
+    if df_bullpen is None:
+        return empty_res
+    if isinstance(df_bullpen, list):
+        if len(df_bullpen) == 0:
+            return empty_res
+        df_bullpen = pd.DataFrame(df_bullpen)
+    elif not isinstance(df_bullpen, pd.DataFrame):
+        return empty_res
+
     if df_bullpen.empty:
-        return pd.DataFrame()
-        
+        return empty_res
+
+    for c, val in [("pitcher_name", "Desconocido"), ("inherited_runners", 0), ("inherited_scored", 0)]:
+        if c not in df_bullpen.columns:
+            df_bullpen[c] = val
+        else:
+            df_bullpen[c] = df_bullpen[c].fillna(val)
+
     agg = df_bullpen.groupby("pitcher_name").agg(
         Apariciones_Herencia=("inherited_runners", "count"),
         Total_IR=("inherited_runners", "sum"),
         Total_IRS=("inherited_scored", "sum")
     ).reset_index()
-    
-    agg["Tasa_IRS_pct"] = (agg["Total_IRS"] / agg["Total_IR"] * 100).round(1)
+
+    agg["Tasa_IRS_pct"] = np.where(agg["Total_IR"] > 0, (agg["Total_IRS"] / agg["Total_IR"] * 100).round(1), 0.0)
     agg = agg.sort_values(by=["Total_IR", "Tasa_IRS_pct"], ascending=[False, True])
-    
+
     rename_cols = {
         "pitcher_name": "Lanzador Relevista",
         "Apariciones_Herencia": "Juegos con Herencia",
@@ -192,4 +236,15 @@ def compute_bullpen_inherited_stats(df_bullpen: pd.DataFrame) -> pd.DataFrame:
         "Total_IRS": "Heredados Anotados (IRS)",
         "Tasa_IRS_pct": "% Anotados (IRS%)"
     }
-    return agg.rename(columns=rename_cols)
+    result_df = agg.rename(columns=rename_cols)
+    tot_ir = int(agg["Total_IR"].sum()) if not agg.empty else 0
+    tot_irs = int(agg["Total_IRS"].sum()) if not agg.empty else 0
+    irs_pct = round(tot_irs / tot_ir * 100, 1) if tot_ir > 0 else 0.0
+
+    return BullpenResult(result_df, extra_dict={
+        "summary_df": result_df,
+        "detailed_df": df_bullpen,
+        "total_ir": tot_ir,
+        "total_irs": tot_irs,
+        "irs_pct": irs_pct,
+    })
