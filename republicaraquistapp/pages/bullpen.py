@@ -168,7 +168,7 @@ def bullpen_tab_view() -> rx.Component:
                         align="center",
                         spacing="2",
                     ),
-                    rx.plotly(data=BullpenState.bullpen_chart_figure, height="380px", width="100%"),
+                    rx.plotly.cartesian(data=BullpenState.bullpen_chart_figure, height="380px", width="100%"),
                     spacing="3",
                     width="100%",
                 ),
@@ -429,7 +429,7 @@ def lineups_tab_view() -> rx.Component:
                     rx.box(
                         rx.vstack(
                             rx.heading("MATRIZ DE CALOR: TITULARIDADES POR TURNO 1 AL 9", size="3", color=TEXT_PRIMARY),
-                            rx.plotly(data=BullpenState.lineup_heatmap_figure, height="480px", width="100%"),
+                            rx.plotly.cartesian(data=BullpenState.lineup_heatmap_figure, height="480px", width="100%"),
                             spacing="3",
                             width="100%",
                         ),

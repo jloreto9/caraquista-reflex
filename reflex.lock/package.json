@@ -13,7 +13,7 @@
     "isbot": "5.2.1",
     "lucide-react": "1.26.0",
     "mergician": "v2.0.2",
-    "plotly.js": "3.7.0",
+    "plotly.js-cartesian-dist-min": "3.7.0",
     "react": "19.2.8",
     "react-debounce-input": "3.3.0",
     "react-dom": "19.2.8",

@@ -345,7 +345,7 @@ def batting_tab_view() -> rx.Component:
         ),
         # Gráfico Top 10 OPS
         rx.box(
-            rx.plotly(data=IndividualesState.top_batters_chart),
+            rx.plotly.cartesian(data=IndividualesState.top_batters_chart),
             style=CARD_STYLE,
             width="100%",
         ),
@@ -495,7 +495,7 @@ def pitching_tab_view() -> rx.Component:
         ),
         # Gráfico Top 10 Ponches
         rx.box(
-            rx.plotly(data=IndividualesState.top_pitchers_chart),
+            rx.plotly.cartesian(data=IndividualesState.top_pitchers_chart),
             style=CARD_STYLE,
             width="100%",
         ),
@@ -717,7 +717,7 @@ def comparator_tab_view() -> rx.Component:
                         align="center",
                         spacing="2",
                     ),
-                    rx.plotly(data=IndividualesState.radar_chart_figure),
+                    rx.plotly.cartesian(data=IndividualesState.radar_chart_figure),
                     spacing="3",
                     width="100%",
                 ),
