@@ -309,12 +309,12 @@ class LobResult(tuple):
             return super().__getitem__(0)
         elif item in ("players_df", 1):
             return super().__getitem__(1)
-        if isinstance(self[0], dict) and item in self[0]:
+        if isinstance(item, str) and isinstance(self[0], dict) and item in self[0]:
             return self[0][item]
         raise KeyError(item)
 
     def __contains__(self, item):
-        return item in ("summary", "players_df", 0, 1) or (isinstance(self[0], dict) and item in self[0])
+        return item in ("summary", "players_df", 0, 1) or (isinstance(item, str) and isinstance(self[0], dict) and item in self[0])
 
     def get(self, item, default=None):
         try:

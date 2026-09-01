@@ -420,5 +420,45 @@ class TestMonteCarloSimulations(unittest.TestCase):
             )
 
 
+class TestBullpenAndLineupResults(unittest.TestCase):
+    """Pruebas de integridad analítica para BullpenResult y LobResult."""
+
+    def test_bullpen_result_series_boolean_indexing(self):
+        """Verifica que el filtrado por pd.Series booleano no arroje 'TypeError: unhashable type: Series'."""
+        from core.bullpen_lineups import compute_bullpen_inherited_stats, BullpenResult
+
+        mock_data = pd.DataFrame([
+            {"pitcher_name": "Lanzador A", "inherited_runners": 6, "inherited_scored": 1},
+            {"pitcher_name": "Lanzador B", "inherited_runners": 3, "inherited_scored": 2},
+            {"pitcher_name": "Lanzador C", "inherited_runners": 8, "inherited_scored": 3},
+        ])
+
+        res = compute_bullpen_inherited_stats(mock_data)
+        self.assertIsInstance(res, BullpenResult)
+
+        # 1. Acceso de diccionario
+        self.assertEqual(res["total_ir"], 17)
+        self.assertEqual(res["total_irs"], 6)
+
+        # 2. Filtrado con boolean Series (la operación que antes causaba unhashable type: Series)
+        filtered = res[res["Corredores Heredados (IR)"] >= 5]
+        self.assertEqual(len(filtered), 2)
+        self.assertIn("Lanzador A", filtered["Lanzador Relevista"].values)
+        self.assertIn("Lanzador C", filtered["Lanzador Relevista"].values)
+
+    def test_lob_result_key_and_tuple_access(self):
+        """Verifica que LobResult soporte tanto acceso de tupla como de diccionario."""
+        from core.situational import LobResult
+
+        summary = {"total_pa": 100, "total_lob_ending": 15}
+        df_players = pd.DataFrame([{"player_name": "Bateador 1", "lob": 5}])
+        lob_res = LobResult(summary, df_players)
+
+        # Acceso por clave y tupla
+        self.assertEqual(lob_res["total_pa"], 100)
+        self.assertEqual(lob_res[0]["total_lob_ending"], 15)
+        self.assertEqual(len(lob_res[1]), 1)
+
+
 if __name__ == '__main__':
     unittest.main()

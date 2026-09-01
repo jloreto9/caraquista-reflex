@@ -181,12 +181,12 @@ class BullpenResult(pd.DataFrame):
         object.__setattr__(self, "_extra_dict", extra_dict or {})
 
     def __getitem__(self, key):
-        if hasattr(self, "_extra_dict") and key in self._extra_dict:
+        if isinstance(key, str) and hasattr(self, "_extra_dict") and key in self._extra_dict:
             return self._extra_dict[key]
         return super().__getitem__(key)
 
     def __contains__(self, key):
-        if hasattr(self, "_extra_dict") and key in self._extra_dict:
+        if isinstance(key, str) and hasattr(self, "_extra_dict") and key in self._extra_dict:
             return True
         return super().__contains__(key)
 
