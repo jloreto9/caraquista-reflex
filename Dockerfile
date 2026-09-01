@@ -39,6 +39,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     caddy \
     curl \
     ca-certificates \
+    dos2unix \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy installed Python environment from builder
@@ -51,7 +52,7 @@ COPY --from=builder /app /app
 # Copy Caddy reverse proxy config and entrypoint
 COPY Caddyfile /etc/caddy/Caddyfile
 COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+RUN sed -i 's/\r$//' /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 EXPOSE 3000
 
