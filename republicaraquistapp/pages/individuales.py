@@ -304,7 +304,7 @@ def batting_tab_view() -> rx.Component:
         ),
         # Tabla Sabermétrica de Bateo
         rx.box(
-            rx.vstack(
+            rx.box(
                 rx.table.root(
                     rx.table.header(
                         rx.table.row(
@@ -337,9 +337,8 @@ def batting_tab_view() -> rx.Component:
                     size="2",
                     width="100%",
                 ),
-                spacing="2",
-                width="100%",
                 overflow_x="auto",
+                width="100%",
             ),
             style=CARD_STYLE,
             width="100%",
@@ -734,20 +733,24 @@ def comparator_tab_view() -> rx.Component:
                         align="center",
                         spacing="2",
                     ),
-                    rx.table.root(
-                        rx.table.header(
-                            rx.table.row(
-                                rx.table.column_header_cell("Categoría"),
-                                rx.table.column_header_cell("Jugador 1"),
-                                rx.table.column_header_cell("Jugador 2"),
-                                rx.table.column_header_cell("Líder"),
+                    rx.box(
+                        rx.table.root(
+                            rx.table.header(
+                                rx.table.row(
+                                    rx.table.column_header_cell("Categoría"),
+                                    rx.table.column_header_cell("Jugador 1"),
+                                    rx.table.column_header_cell("Jugador 2"),
+                                    rx.table.column_header_cell("Líder"),
+                                ),
                             ),
+                            rx.table.body(
+                                rx.foreach(IndividualesState.h2h_rows, h2h_comparison_row),
+                            ),
+                            variant="surface",
+                            size="2",
+                            width="100%",
                         ),
-                        rx.table.body(
-                            rx.foreach(IndividualesState.h2h_rows, h2h_comparison_row),
-                        ),
-                        variant="surface",
-                        size="2",
+                        overflow_x="auto",
                         width="100%",
                     ),
                     spacing="3",

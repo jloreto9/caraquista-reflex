@@ -219,30 +219,34 @@ def situational_splits_tab() -> rx.Component:
                         align="center",
                         spacing="2",
                     ),
-                    rx.table.root(
-                        rx.table.header(
-                            rx.table.row(
-                                rx.table.column_header_cell("Situación"),
-                                rx.table.column_header_cell("PA"),
-                                rx.table.column_header_cell("AB"),
-                                rx.table.column_header_cell("H"),
-                                rx.table.column_header_cell("2B"),
-                                rx.table.column_header_cell("3B"),
-                                rx.table.column_header_cell("HR"),
-                                rx.table.column_header_cell("BB"),
-                                rx.table.column_header_cell("SO"),
-                                rx.table.column_header_cell("RBI"),
-                                rx.table.column_header_cell("AVG"),
-                                rx.table.column_header_cell("OBP"),
-                                rx.table.column_header_cell("SLG"),
-                                rx.table.column_header_cell("OPS"),
-                            )
+                    rx.box(
+                        rx.table.root(
+                            rx.table.header(
+                                rx.table.row(
+                                    rx.table.column_header_cell("Situación"),
+                                    rx.table.column_header_cell("PA"),
+                                    rx.table.column_header_cell("AB"),
+                                    rx.table.column_header_cell("H"),
+                                    rx.table.column_header_cell("2B"),
+                                    rx.table.column_header_cell("3B"),
+                                    rx.table.column_header_cell("HR"),
+                                    rx.table.column_header_cell("BB"),
+                                    rx.table.column_header_cell("SO"),
+                                    rx.table.column_header_cell("RBI"),
+                                    rx.table.column_header_cell("AVG"),
+                                    rx.table.column_header_cell("OBP"),
+                                    rx.table.column_header_cell("SLG"),
+                                    rx.table.column_header_cell("OPS"),
+                                )
+                            ),
+                            rx.table.body(
+                                rx.foreach(SituationalState.splits_table_data, split_table_row)
+                            ),
+                            variant="surface",
+                            size="1",
+                            width="100%",
                         ),
-                        rx.table.body(
-                            rx.foreach(SituationalState.splits_table_data, split_table_row)
-                        ),
-                        variant="surface",
-                        size="1",
+                        overflow_x="auto",
                         width="100%",
                     ),
                     spacing="3",
@@ -332,25 +336,29 @@ def lob_tracker_tab() -> rx.Component:
                         align="center",
                         spacing="2",
                     ),
-                    rx.table.root(
-                        rx.table.header(
-                            rx.table.row(
-                                rx.table.column_header_cell("Bateador"),
-                                rx.table.column_header_cell("PA"),
-                                rx.table.column_header_cell("PA RISP"),
-                                rx.table.column_header_cell("RBI"),
-                                rx.table.column_header_cell("AVG RISP"),
-                                rx.table.column_header_cell("LOB 3er Out"),
-                                rx.table.column_header_cell("RISP 3er Out"),
-                                rx.table.column_header_cell("RISP Mid-Inn"),
-                                rx.table.column_header_cell("Total RISP LOB"),
-                            )
+                    rx.box(
+                        rx.table.root(
+                            rx.table.header(
+                                rx.table.row(
+                                    rx.table.column_header_cell("Bateador"),
+                                    rx.table.column_header_cell("PA"),
+                                    rx.table.column_header_cell("PA RISP"),
+                                    rx.table.column_header_cell("RBI"),
+                                    rx.table.column_header_cell("AVG RISP"),
+                                    rx.table.column_header_cell("LOB 3er Out"),
+                                    rx.table.column_header_cell("RISP 3er Out"),
+                                    rx.table.column_header_cell("RISP Mid-Inn"),
+                                    rx.table.column_header_cell("Total RISP LOB"),
+                                )
+                            ),
+                            rx.table.body(
+                                rx.foreach(SituationalState.lob_players_data, lob_table_row)
+                            ),
+                            variant="surface",
+                            size="1",
+                            width="100%",
                         ),
-                        rx.table.body(
-                            rx.foreach(SituationalState.lob_players_data, lob_table_row)
-                        ),
-                        variant="surface",
-                        size="1",
+                        overflow_x="auto",
                         width="100%",
                     ),
                     spacing="3",
@@ -419,30 +427,34 @@ def bvp_matchup_tab() -> rx.Component:
                     align="center",
                     width="100%",
                 ),
-                rx.table.root(
-                    rx.table.header(
-                        rx.table.row(
-                            rx.table.column_header_cell("Logo"),
-                            rx.table.column_header_cell("Lanzador Rival"),
-                            rx.table.column_header_cell("Equipo"),
-                            rx.table.column_header_cell("PA"),
-                            rx.table.column_header_cell("AB"),
-                            rx.table.column_header_cell("H"),
-                            rx.table.column_header_cell("HR"),
-                            rx.table.column_header_cell("RBI"),
-                            rx.table.column_header_cell("BB"),
-                            rx.table.column_header_cell("SO"),
-                            rx.table.column_header_cell("AVG"),
-                            rx.table.column_header_cell("OBP"),
-                            rx.table.column_header_cell("SLG"),
-                            rx.table.column_header_cell("OPS"),
-                        )
+                rx.box(
+                    rx.table.root(
+                        rx.table.header(
+                            rx.table.row(
+                                rx.table.column_header_cell("Logo"),
+                                rx.table.column_header_cell("Lanzador Rival"),
+                                rx.table.column_header_cell("Equipo"),
+                                rx.table.column_header_cell("PA"),
+                                rx.table.column_header_cell("AB"),
+                                rx.table.column_header_cell("H"),
+                                rx.table.column_header_cell("HR"),
+                                rx.table.column_header_cell("RBI"),
+                                rx.table.column_header_cell("BB"),
+                                rx.table.column_header_cell("SO"),
+                                rx.table.column_header_cell("AVG"),
+                                rx.table.column_header_cell("OBP"),
+                                rx.table.column_header_cell("SLG"),
+                                rx.table.column_header_cell("OPS"),
+                            )
+                        ),
+                        rx.table.body(
+                            rx.foreach(SituationalState.bvp_table_data, bvp_table_row)
+                        ),
+                        variant="surface",
+                        size="1",
+                        width="100%",
                     ),
-                    rx.table.body(
-                        rx.foreach(SituationalState.bvp_table_data, bvp_table_row)
-                    ),
-                    variant="surface",
-                    size="1",
+                    overflow_x="auto",
                     width="100%",
                 ),
                 spacing="3",

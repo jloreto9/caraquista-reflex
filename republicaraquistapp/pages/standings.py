@@ -121,30 +121,34 @@ def tab_official_standings() -> rx.Component:
 
         # Tabla de Posiciones
         rx.box(
-            rx.table.root(
-                rx.table.header(
-                    rx.table.row(
-                        rx.table.column_header_cell("POS"),
-                        rx.table.column_header_cell("EQUIPO"),
-                        rx.table.column_header_cell("JJ"),
-                        rx.table.column_header_cell("G"),
-                        rx.table.column_header_cell("P"),
-                        rx.table.column_header_cell("PCT"),
-                        rx.table.column_header_cell("JD"),
-                        rx.table.column_header_cell("LOCAL"),
-                        rx.table.column_header_cell("VISITANTE"),
-                        rx.table.column_header_cell("CF"),
-                        rx.table.column_header_cell("CP"),
-                        rx.table.column_header_cell("DIF"),
-                        rx.table.column_header_cell("RACHA"),
-                        rx.table.column_header_cell("L10"),
-                    )
+            rx.box(
+                rx.table.root(
+                    rx.table.header(
+                        rx.table.row(
+                            rx.table.column_header_cell("POS"),
+                            rx.table.column_header_cell("EQUIPO"),
+                            rx.table.column_header_cell("JJ"),
+                            rx.table.column_header_cell("G"),
+                            rx.table.column_header_cell("P"),
+                            rx.table.column_header_cell("PCT"),
+                            rx.table.column_header_cell("JD"),
+                            rx.table.column_header_cell("LOCAL"),
+                            rx.table.column_header_cell("VISITANTE"),
+                            rx.table.column_header_cell("CF"),
+                            rx.table.column_header_cell("CP"),
+                            rx.table.column_header_cell("DIF"),
+                            rx.table.column_header_cell("RACHA"),
+                            rx.table.column_header_cell("L10"),
+                        )
+                    ),
+                    rx.table.body(
+                        rx.foreach(StandingsState.standings_data, official_standings_row)
+                    ),
+                    variant="surface",
+                    size="2",
+                    width="100%",
                 ),
-                rx.table.body(
-                    rx.foreach(StandingsState.standings_data, official_standings_row)
-                ),
-                variant="surface",
-                size="2",
+                overflow_x="auto",
                 width="100%",
             ),
             style=CARD_STYLE,
@@ -378,28 +382,32 @@ def tab_pythagorean_standings() -> rx.Component:
 
         # Tabla Completa Pitagórica
         rx.box(
-            rx.table.root(
-                rx.table.header(
-                    rx.table.row(
-                        rx.table.column_header_cell("EQUIPO"),
-                        rx.table.column_header_cell("G REAL"),
-                        rx.table.column_header_cell("P REAL"),
-                        rx.table.column_header_cell("CF"),
-                        rx.table.column_header_cell("CP"),
-                        rx.table.column_header_cell("DIF"),
-                        rx.table.column_header_cell("PCT REAL"),
-                        rx.table.column_header_cell("PCT PIT"),
-                        rx.table.column_header_cell("xW (ESP)"),
-                        rx.table.column_header_cell("xL (ESP)"),
-                        rx.table.column_header_cell("DIF (G-xW)"),
-                        rx.table.column_header_cell("DIAGNÓSTICO"),
-                    )
+            rx.box(
+                rx.table.root(
+                    rx.table.header(
+                        rx.table.row(
+                            rx.table.column_header_cell("EQUIPO"),
+                            rx.table.column_header_cell("G REAL"),
+                            rx.table.column_header_cell("P REAL"),
+                            rx.table.column_header_cell("CF"),
+                            rx.table.column_header_cell("CP"),
+                            rx.table.column_header_cell("DIF"),
+                            rx.table.column_header_cell("PCT REAL"),
+                            rx.table.column_header_cell("PCT PIT"),
+                            rx.table.column_header_cell("xW (ESP)"),
+                            rx.table.column_header_cell("xL (ESP)"),
+                            rx.table.column_header_cell("DIF (G-xW)"),
+                            rx.table.column_header_cell("DIAGNÓSTICO"),
+                        )
+                    ),
+                    rx.table.body(
+                        rx.foreach(StandingsState.pythagorean_data, pythagorean_row)
+                    ),
+                    variant="surface",
+                    size="2",
+                    width="100%",
                 ),
-                rx.table.body(
-                    rx.foreach(StandingsState.pythagorean_data, pythagorean_row)
-                ),
-                variant="surface",
-                size="2",
+                overflow_x="auto",
                 width="100%",
             ),
             style=CARD_STYLE,
@@ -629,23 +637,27 @@ def tab_elo_and_monte_carlo() -> rx.Component:
                 ),
 
                 # Tabla de Probabilidades de Postemporada
-                rx.table.root(
-                    rx.table.header(
-                        rx.table.row(
-                            rx.table.column_header_cell("EQUIPO"),
-                            rx.table.column_header_cell("RATING ELO"),
-                            rx.table.column_header_cell("TOP 4 (RR)"),
-                            rx.table.column_header_cell("WILD CARD (5-6)"),
-                            rx.table.column_header_cell("PASE TOTAL RR"),
-                            rx.table.column_header_cell("GRAN FINAL"),
-                            rx.table.column_header_cell("🏆 CAMPEÓN LVBP"),
-                        )
+                rx.box(
+                    rx.table.root(
+                        rx.table.header(
+                            rx.table.row(
+                                rx.table.column_header_cell("EQUIPO"),
+                                rx.table.column_header_cell("RATING ELO"),
+                                rx.table.column_header_cell("TOP 4 (RR)"),
+                                rx.table.column_header_cell("WILD CARD (5-6)"),
+                                rx.table.column_header_cell("PASE TOTAL RR"),
+                                rx.table.column_header_cell("GRAN FINAL"),
+                                rx.table.column_header_cell("🏆 CAMPEÓN LVBP"),
+                            )
+                        ),
+                        rx.table.body(
+                            rx.foreach(StandingsState.projections_data, monte_carlo_proj_row)
+                        ),
+                        variant="surface",
+                        size="2",
+                        width="100%",
                     ),
-                    rx.table.body(
-                        rx.foreach(StandingsState.projections_data, monte_carlo_proj_row)
-                    ),
-                    variant="surface",
-                    size="2",
+                    overflow_x="auto",
                     width="100%",
                 ),
                 spacing="4",
@@ -672,26 +684,30 @@ def tab_elo_and_monte_carlo() -> rx.Component:
                     padding_bottom="0.75rem",
                     border_bottom=f"1px solid {BORDER_CARD}",
                 ),
-                rx.table.root(
-                    rx.table.header(
-                        rx.table.row(
-                            rx.table.column_header_cell("EQUIPO"),
-                            rx.table.column_header_cell("ELO"),
-                            rx.table.column_header_cell("1°"),
-                            rx.table.column_header_cell("2°"),
-                            rx.table.column_header_cell("3°"),
-                            rx.table.column_header_cell("4°"),
-                            rx.table.column_header_cell("5°"),
-                            rx.table.column_header_cell("6°"),
-                            rx.table.column_header_cell("7°"),
-                            rx.table.column_header_cell("8°"),
-                        )
+                rx.box(
+                    rx.table.root(
+                        rx.table.header(
+                            rx.table.row(
+                                rx.table.column_header_cell("EQUIPO"),
+                                rx.table.column_header_cell("ELO"),
+                                rx.table.column_header_cell("1°"),
+                                rx.table.column_header_cell("2°"),
+                                rx.table.column_header_cell("3°"),
+                                rx.table.column_header_cell("4°"),
+                                rx.table.column_header_cell("5°"),
+                                rx.table.column_header_cell("6°"),
+                                rx.table.column_header_cell("7°"),
+                                rx.table.column_header_cell("8°"),
+                            )
+                        ),
+                        rx.table.body(
+                            rx.foreach(StandingsState.position_matrix_data, position_matrix_row)
+                        ),
+                        variant="surface",
+                        size="2",
+                        width="100%",
                     ),
-                    rx.table.body(
-                        rx.foreach(StandingsState.position_matrix_data, position_matrix_row)
-                    ),
-                    variant="surface",
-                    size="2",
+                    overflow_x="auto",
                     width="100%",
                 ),
                 spacing="3",
@@ -881,21 +897,25 @@ def tab_elo_and_monte_carlo() -> rx.Component:
                     padding_bottom="0.75rem",
                     border_bottom=f"1px solid {BORDER_CARD}",
                 ),
-                rx.table.root(
-                    rx.table.header(
-                        rx.table.row(
-                            rx.table.column_header_cell("RANK"),
-                            rx.table.column_header_cell("EQUIPO"),
-                            rx.table.column_header_cell("RATING ELO"),
-                            rx.table.column_header_cell("DIF BASE (1500)"),
-                            rx.table.column_header_cell("JUEGOS"),
-                        )
+                rx.box(
+                    rx.table.root(
+                        rx.table.header(
+                            rx.table.row(
+                                rx.table.column_header_cell("RANK"),
+                                rx.table.column_header_cell("EQUIPO"),
+                                rx.table.column_header_cell("RATING ELO"),
+                                rx.table.column_header_cell("DIF BASE (1500)"),
+                                rx.table.column_header_cell("JUEGOS"),
+                            )
+                        ),
+                        rx.table.body(
+                            rx.foreach(StandingsState.elo_ratings_data, elo_ranking_row)
+                        ),
+                        variant="surface",
+                        size="2",
+                        width="100%",
                     ),
-                    rx.table.body(
-                        rx.foreach(StandingsState.elo_ratings_data, elo_ranking_row)
-                    ),
-                    variant="surface",
-                    size="2",
+                    overflow_x="auto",
                     width="100%",
                 ),
                 spacing="3",
@@ -1161,25 +1181,29 @@ def tab_situational_and_iso_weeks() -> rx.Component:
                     padding_bottom="0.75rem",
                     border_bottom=f"1px solid {BORDER_CARD}",
                 ),
-                rx.table.root(
-                    rx.table.header(
-                        rx.table.row(
-                            rx.table.column_header_cell("SEMANA"),
-                            rx.table.column_header_cell("JJ"),
-                            rx.table.column_header_cell("G"),
-                            rx.table.column_header_cell("P"),
-                            rx.table.column_header_cell("PCT"),
-                            rx.table.column_header_cell("CF"),
-                            rx.table.column_header_cell("CP"),
-                            rx.table.column_header_cell("DIF"),
-                            rx.table.column_header_cell("RÉCORD"),
-                        )
+                rx.box(
+                    rx.table.root(
+                        rx.table.header(
+                            rx.table.row(
+                                rx.table.column_header_cell("SEMANA"),
+                                rx.table.column_header_cell("JJ"),
+                                rx.table.column_header_cell("G"),
+                                rx.table.column_header_cell("P"),
+                                rx.table.column_header_cell("PCT"),
+                                rx.table.column_header_cell("CF"),
+                                rx.table.column_header_cell("CP"),
+                                rx.table.column_header_cell("DIF"),
+                                rx.table.column_header_cell("RÉCORD"),
+                            )
+                        ),
+                        rx.table.body(
+                            rx.foreach(StandingsState.weekly_records_data, iso_weekly_row)
+                        ),
+                        variant="surface",
+                        size="2",
+                        width="100%",
                     ),
-                    rx.table.body(
-                        rx.foreach(StandingsState.weekly_records_data, iso_weekly_row)
-                    ),
-                    variant="surface",
-                    size="2",
+                    overflow_x="auto",
                     width="100%",
                 ),
                 spacing="3",

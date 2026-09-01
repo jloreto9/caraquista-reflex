@@ -117,10 +117,19 @@ def executive_kpi_grid() -> rx.Component:
 def recent_game_item(game: dict) -> rx.Component:
     """Fila visual representativa de un juego previo de los Leones."""
     return rx.hstack(
-        rx.text(game["date"], size="1", color=TEXT_MUTED, width="75px"),
+        rx.text(game["date"], size="1", color=TEXT_MUTED, width=rx.breakpoints(initial="60px", sm="75px")),
         rx.hstack(
             rx.image(src=game["away_logo"], width="20px", height="20px"),
-            rx.text(game["away_name"], size="2", color=TEXT_PRIMARY, font_weight="500"),
+            rx.text(
+                game["away_name"],
+                size="2",
+                color=TEXT_PRIMARY,
+                font_weight="500",
+                overflow="hidden",
+                text_overflow="ellipsis",
+                white_space="nowrap",
+                max_width=rx.breakpoints(initial="85px", sm="140px"),
+            ),
             align="center",
             spacing="2",
             flex="1",
@@ -130,12 +139,21 @@ def recent_game_item(game: dict) -> rx.Component:
             size="2",
             font_weight="800",
             color=ACCENT_GOLD,
-            width="60px",
+            width="55px",
             text_align="center",
         ),
         rx.hstack(
             rx.image(src=game["home_logo"], width="20px", height="20px"),
-            rx.text(game["home_name"], size="2", color=TEXT_PRIMARY, font_weight="500"),
+            rx.text(
+                game["home_name"],
+                size="2",
+                color=TEXT_PRIMARY,
+                font_weight="500",
+                overflow="hidden",
+                text_overflow="ellipsis",
+                white_space="nowrap",
+                max_width=rx.breakpoints(initial="85px", sm="140px"),
+            ),
             align="center",
             spacing="2",
             flex="1",
@@ -241,64 +259,81 @@ def iso_week_summary_card() -> rx.Component:
                 padding_bottom="0.75rem",
                 border_bottom=f"1px solid {BORDER_CARD}",
             ),
-            rx.hstack(
-                rx.vstack(
-                    rx.text("RÉCORD SEMANAL", size="1", color=TEXT_MUTED, font_weight="600"),
-                    rx.heading(
-                        StandingsState.latest_weekly_record["record"],
-                        size="6",
-                        color=ACCENT_GOLD,
-                        font_weight="800",
+            rx.grid(
+                rx.box(
+                    rx.vstack(
+                        rx.text("RÉCORD SEMANAL", size="1", color=TEXT_MUTED, font_weight="600"),
+                        rx.heading(
+                            StandingsState.latest_weekly_record["record"],
+                            size="5",
+                            color=ACCENT_GOLD,
+                            font_weight="800",
+                        ),
+                        rx.text(f"PCT: {StandingsState.latest_weekly_record['pct']}", size="1", color=TEXT_MUTED),
+                        spacing="1",
+                        align="center",
                     ),
-                    rx.text(f"PCT: {StandingsState.latest_weekly_record['pct']}", size="1", color=TEXT_MUTED),
-                    spacing="1",
-                    align="center",
-                    flex="1",
+                    padding="0.5rem",
+                    border_radius="8px",
+                    background="rgba(255, 255, 255, 0.02)",
+                    border=f"1px solid {BORDER_CARD}",
                 ),
-                rx.divider(orientation="vertical", size="4"),
-                rx.vstack(
-                    rx.text("CARRERAS A FAVOR", size="1", color=TEXT_MUTED, font_weight="600"),
-                    rx.heading(
-                        StandingsState.latest_weekly_record["cf"].to_string(),
-                        size="5",
-                        color=TEXT_PRIMARY,
-                        font_weight="800",
+                rx.box(
+                    rx.vstack(
+                        rx.text("CARRERAS A FAVOR", size="1", color=TEXT_MUTED, font_weight="600"),
+                        rx.heading(
+                            StandingsState.latest_weekly_record["cf"].to_string(),
+                            size="5",
+                            color=TEXT_PRIMARY,
+                            font_weight="800",
+                        ),
+                        rx.text("Ofensiva colectiva", size="1", color=TEXT_MUTED),
+                        spacing="1",
+                        align="center",
                     ),
-                    rx.text("Ofensiva colectiva", size="1", color=TEXT_MUTED),
-                    spacing="1",
-                    align="center",
-                    flex="1",
+                    padding="0.5rem",
+                    border_radius="8px",
+                    background="rgba(255, 255, 255, 0.02)",
+                    border=f"1px solid {BORDER_CARD}",
                 ),
-                rx.divider(orientation="vertical", size="4"),
-                rx.vstack(
-                    rx.text("CARRERAS PERMITIDAS", size="1", color=TEXT_MUTED, font_weight="600"),
-                    rx.heading(
-                        StandingsState.latest_weekly_record["cp"].to_string(),
-                        size="5",
-                        color=TEXT_PRIMARY,
-                        font_weight="800",
+                rx.box(
+                    rx.vstack(
+                        rx.text("CARRERAS PERMITIDAS", size="1", color=TEXT_MUTED, font_weight="600"),
+                        rx.heading(
+                            StandingsState.latest_weekly_record["cp"].to_string(),
+                            size="5",
+                            color=TEXT_PRIMARY,
+                            font_weight="800",
+                        ),
+                        rx.text("Pitcheo y defensa", size="1", color=TEXT_MUTED),
+                        spacing="1",
+                        align="center",
                     ),
-                    rx.text("Pitcheo y defensa", size="1", color=TEXT_MUTED),
-                    spacing="1",
-                    align="center",
-                    flex="1",
+                    padding="0.5rem",
+                    border_radius="8px",
+                    background="rgba(255, 255, 255, 0.02)",
+                    border=f"1px solid {BORDER_CARD}",
                 ),
-                rx.divider(orientation="vertical", size="4"),
-                rx.vstack(
-                    rx.text("DIFERENCIAL", size="1", color=TEXT_MUTED, font_weight="600"),
-                    rx.heading(
-                        StandingsState.latest_weekly_record["dif"],
-                        size="5",
-                        color=StandingsState.latest_weekly_record["dif_color"],
-                        font_weight="800",
+                rx.box(
+                    rx.vstack(
+                        rx.text("DIFERENCIAL", size="1", color=TEXT_MUTED, font_weight="600"),
+                        rx.heading(
+                            StandingsState.latest_weekly_record["dif"],
+                            size="5",
+                            color=StandingsState.latest_weekly_record["dif_color"],
+                            font_weight="800",
+                        ),
+                        rx.text("Margen neto", size="1", color=TEXT_MUTED),
+                        spacing="1",
+                        align="center",
                     ),
-                    rx.text("Margen neto", size="1", color=TEXT_MUTED),
-                    spacing="1",
-                    align="center",
-                    flex="1",
+                    padding="0.5rem",
+                    border_radius="8px",
+                    background="rgba(255, 255, 255, 0.02)",
+                    border=f"1px solid {BORDER_CARD}",
                 ),
-                align="center",
-                justify="center",
+                columns=rx.breakpoints(initial="2", sm="4"),
+                spacing="3",
                 width="100%",
                 padding_y="0.75rem",
             ),
@@ -331,7 +366,7 @@ def standings_preview_row(team: dict) -> rx.Component:
         rx.table.cell(
             rx.hstack(
                 rx.image(src=team["logo"], width="24px", height="24px"),
-                rx.text(team["team_name"], font_weight="700", color=team["text_color"]),
+                rx.text(team["team_name"], font_weight="700", color=team["text_color"], white_space="nowrap"),
                 align="center",
                 spacing="2",
             )
@@ -377,25 +412,29 @@ def standings_preview_card() -> rx.Component:
                 padding_bottom="0.75rem",
                 border_bottom=f"1px solid {BORDER_CARD}",
             ),
-            rx.table.root(
-                rx.table.header(
-                    rx.table.row(
-                        rx.table.column_header_cell("POS"),
-                        rx.table.column_header_cell("EQUIPO"),
-                        rx.table.column_header_cell("JJ"),
-                        rx.table.column_header_cell("G"),
-                        rx.table.column_header_cell("P"),
-                        rx.table.column_header_cell("PCT"),
-                        rx.table.column_header_cell("JD"),
-                        rx.table.column_header_cell("DIF"),
-                        rx.table.column_header_cell("RACHA"),
-                    )
+            rx.box(
+                rx.table.root(
+                    rx.table.header(
+                        rx.table.row(
+                            rx.table.column_header_cell("POS"),
+                            rx.table.column_header_cell("EQUIPO"),
+                            rx.table.column_header_cell("JJ"),
+                            rx.table.column_header_cell("G"),
+                            rx.table.column_header_cell("P"),
+                            rx.table.column_header_cell("PCT"),
+                            rx.table.column_header_cell("JD"),
+                            rx.table.column_header_cell("DIF"),
+                            rx.table.column_header_cell("RACHA"),
+                        )
+                    ),
+                    rx.table.body(
+                        rx.foreach(StandingsState.standings_data, standings_preview_row)
+                    ),
+                    variant="surface",
+                    size="2",
+                    width="100%",
                 ),
-                rx.table.body(
-                    rx.foreach(StandingsState.standings_data, standings_preview_row)
-                ),
-                variant="surface",
-                size="2",
+                overflow_x="auto",
                 width="100%",
             ),
             spacing="3",

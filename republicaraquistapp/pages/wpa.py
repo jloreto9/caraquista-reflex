@@ -281,20 +281,24 @@ def single_game_view() -> rx.Component:
                         align="center",
                         spacing="2",
                     ),
-                    rx.table.root(
-                        rx.table.header(
-                            rx.table.row(
-                                rx.table.column_header_cell("Jugador"),
-                                rx.table.column_header_cell("WPA Total"),
-                                rx.table.column_header_cell("WPA / LI"),
-                                rx.table.column_header_cell("Clutch"),
-                            )
+                    rx.box(
+                        rx.table.root(
+                            rx.table.header(
+                                rx.table.row(
+                                    rx.table.column_header_cell("Jugador"),
+                                    rx.table.column_header_cell("WPA Total"),
+                                    rx.table.column_header_cell("WPA / LI"),
+                                    rx.table.column_header_cell("Clutch"),
+                                )
+                            ),
+                            rx.table.body(
+                                rx.foreach(WpaState.player_game_wpa, player_wpa_row)
+                            ),
+                            variant="surface",
+                            size="1",
+                            width="100%",
                         ),
-                        rx.table.body(
-                            rx.foreach(WpaState.player_game_wpa, player_wpa_row)
-                        ),
-                        variant="surface",
-                        size="1",
+                        overflow_x="auto",
                         width="100%",
                     ),
                     spacing="3",
@@ -318,26 +322,30 @@ def single_game_view() -> rx.Component:
                     align="center",
                     width="100%",
                 ),
-                rx.table.root(
-                    rx.table.header(
-                        rx.table.row(
-                            rx.table.column_header_cell("Inning"),
-                            rx.table.column_header_cell("Outs"),
-                            rx.table.column_header_cell("Bases"),
-                            rx.table.column_header_cell("Bateador"),
-                            rx.table.column_header_cell("Lanzador"),
-                            rx.table.column_header_cell("Evento"),
-                            rx.table.column_header_cell("Descripción"),
-                            rx.table.column_header_cell("WPA"),
-                            rx.table.column_header_cell("LI"),
-                            rx.table.column_header_cell("Score"),
-                        )
+                rx.box(
+                    rx.table.root(
+                        rx.table.header(
+                            rx.table.row(
+                                rx.table.column_header_cell("Inning"),
+                                rx.table.column_header_cell("Outs"),
+                                rx.table.column_header_cell("Bases"),
+                                rx.table.column_header_cell("Bateador"),
+                                rx.table.column_header_cell("Lanzador"),
+                                rx.table.column_header_cell("Evento"),
+                                rx.table.column_header_cell("Descripción"),
+                                rx.table.column_header_cell("WPA"),
+                                rx.table.column_header_cell("LI"),
+                                rx.table.column_header_cell("Score"),
+                            )
+                        ),
+                        rx.table.body(
+                            rx.foreach(WpaState.pivotal_plays, pivotal_play_row)
+                        ),
+                        variant="surface",
+                        size="1",
+                        width="100%",
                     ),
-                    rx.table.body(
-                        rx.foreach(WpaState.pivotal_plays, pivotal_play_row)
-                    ),
-                    variant="surface",
-                    size="1",
+                    overflow_x="auto",
                     width="100%",
                 ),
                 spacing="3",
@@ -398,24 +406,28 @@ def season_leaderboard_view() -> rx.Component:
                         align="center",
                         spacing="2",
                     ),
-                    rx.table.root(
-                        rx.table.header(
-                            rx.table.row(
-                                rx.table.column_header_cell("Bateador"),
-                                rx.table.column_header_cell("JJ"),
-                                rx.table.column_header_cell("PA"),
-                                rx.table.column_header_cell("WPA"),
-                                rx.table.column_header_cell("WPA/LI"),
-                                rx.table.column_header_cell("LI Prom"),
-                                rx.table.column_header_cell("High LI"),
-                                rx.table.column_header_cell("Clutch"),
-                            )
+                    rx.box(
+                        rx.table.root(
+                            rx.table.header(
+                                rx.table.row(
+                                    rx.table.column_header_cell("Bateador"),
+                                    rx.table.column_header_cell("JJ"),
+                                    rx.table.column_header_cell("PA"),
+                                    rx.table.column_header_cell("WPA"),
+                                    rx.table.column_header_cell("WPA/LI"),
+                                    rx.table.column_header_cell("LI Prom"),
+                                    rx.table.column_header_cell("High LI"),
+                                    rx.table.column_header_cell("Clutch"),
+                                )
+                            ),
+                            rx.table.body(
+                                rx.foreach(WpaState.season_batters, season_batter_row)
+                            ),
+                            variant="surface",
+                            size="1",
+                            width="100%",
                         ),
-                        rx.table.body(
-                            rx.foreach(WpaState.season_batters, season_batter_row)
-                        ),
-                        variant="surface",
-                        size="1",
+                        overflow_x="auto",
                         width="100%",
                     ),
                     spacing="3",
@@ -433,24 +445,28 @@ def season_leaderboard_view() -> rx.Component:
                         align="center",
                         spacing="2",
                     ),
-                    rx.table.root(
-                        rx.table.header(
-                            rx.table.row(
-                                rx.table.column_header_cell("Lanzador"),
-                                rx.table.column_header_cell("JJ"),
-                                rx.table.column_header_cell("BF"),
-                                rx.table.column_header_cell("WPA"),
-                                rx.table.column_header_cell("WPA/LI"),
-                                rx.table.column_header_cell("LI Prom"),
-                                rx.table.column_header_cell("High LI"),
-                                rx.table.column_header_cell("Clutch"),
-                            )
+                    rx.box(
+                        rx.table.root(
+                            rx.table.header(
+                                rx.table.row(
+                                    rx.table.column_header_cell("Lanzador"),
+                                    rx.table.column_header_cell("JJ"),
+                                    rx.table.column_header_cell("BF"),
+                                    rx.table.column_header_cell("WPA"),
+                                    rx.table.column_header_cell("WPA/LI"),
+                                    rx.table.column_header_cell("LI Prom"),
+                                    rx.table.column_header_cell("High LI"),
+                                    rx.table.column_header_cell("Clutch"),
+                                )
+                            ),
+                            rx.table.body(
+                                rx.foreach(WpaState.season_pitchers, season_pitcher_row)
+                            ),
+                            variant="surface",
+                            size="1",
+                            width="100%",
                         ),
-                        rx.table.body(
-                            rx.foreach(WpaState.season_pitchers, season_pitcher_row)
-                        ),
-                        variant="surface",
-                        size="1",
+                        overflow_x="auto",
                         width="100%",
                     ),
                     spacing="3",
@@ -472,27 +488,31 @@ def season_leaderboard_view() -> rx.Component:
                     align="center",
                     spacing="2",
                 ),
-                rx.table.root(
-                    rx.table.header(
-                        rx.table.row(
-                            rx.table.column_header_cell("Fecha"),
-                            rx.table.column_header_cell("Inn"),
-                            rx.table.column_header_cell("Bateador"),
-                            rx.table.column_header_cell("Lanzador"),
-                            rx.table.column_header_cell("Evento"),
-                            rx.table.column_header_cell("Descripción"),
-                            rx.table.column_header_cell("WPA"),
-                            rx.table.column_header_cell("LI"),
-                        )
+                rx.box(
+                    rx.table.root(
+                        rx.table.header(
+                            rx.table.row(
+                                rx.table.column_header_cell("Fecha"),
+                                rx.table.column_header_cell("Inn"),
+                                rx.table.column_header_cell("Bateador"),
+                                rx.table.column_header_cell("Lanzador"),
+                                rx.table.column_header_cell("Evento"),
+                                rx.table.column_header_cell("Descripción"),
+                                rx.table.column_header_cell("WPA"),
+                                rx.table.column_header_cell("LI"),
+                            )
+                        ),
+                        rx.table.body(
+                            rx.foreach(
+                                WpaState.season_top_positive_plays,
+                                lambda p: top_play_row(p, is_pos=True)
+                            )
+                        ),
+                        variant="surface",
+                        size="1",
+                        width="100%",
                     ),
-                    rx.table.body(
-                        rx.foreach(
-                            WpaState.season_top_positive_plays,
-                            lambda p: top_play_row(p, is_pos=True)
-                        )
-                    ),
-                    variant="surface",
-                    size="1",
+                    overflow_x="auto",
                     width="100%",
                 ),
                 spacing="3",
@@ -510,27 +530,31 @@ def season_leaderboard_view() -> rx.Component:
                     align="center",
                     spacing="2",
                 ),
-                rx.table.root(
-                    rx.table.header(
-                        rx.table.row(
-                            rx.table.column_header_cell("Fecha"),
-                            rx.table.column_header_cell("Inn"),
-                            rx.table.column_header_cell("Bateador"),
-                            rx.table.column_header_cell("Lanzador"),
-                            rx.table.column_header_cell("Evento"),
-                            rx.table.column_header_cell("Descripción"),
-                            rx.table.column_header_cell("WPA"),
-                            rx.table.column_header_cell("LI"),
-                        )
+                rx.box(
+                    rx.table.root(
+                        rx.table.header(
+                            rx.table.row(
+                                rx.table.column_header_cell("Fecha"),
+                                rx.table.column_header_cell("Inn"),
+                                rx.table.column_header_cell("Bateador"),
+                                rx.table.column_header_cell("Lanzador"),
+                                rx.table.column_header_cell("Evento"),
+                                rx.table.column_header_cell("Descripción"),
+                                rx.table.column_header_cell("WPA"),
+                                rx.table.column_header_cell("LI"),
+                            )
+                        ),
+                        rx.table.body(
+                            rx.foreach(
+                                WpaState.season_top_negative_plays,
+                                lambda p: top_play_row(p, is_pos=False)
+                            )
+                        ),
+                        variant="surface",
+                        size="1",
+                        width="100%",
                     ),
-                    rx.table.body(
-                        rx.foreach(
-                            WpaState.season_top_negative_plays,
-                            lambda p: top_play_row(p, is_pos=False)
-                        )
-                    ),
-                    variant="surface",
-                    size="1",
+                    overflow_x="auto",
                     width="100%",
                 ),
                 spacing="3",

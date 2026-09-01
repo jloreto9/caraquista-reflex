@@ -184,21 +184,25 @@ def bullpen_tab_view() -> rx.Component:
                         align="center",
                         spacing="2",
                     ),
-                    rx.table.root(
-                        rx.table.header(
-                            rx.table.row(
-                                rx.table.column_header_cell("Lanzador Relevista"),
-                                rx.table.column_header_cell("Juegos"),
-                                rx.table.column_header_cell("Total IR"),
-                                rx.table.column_header_cell("Total IRS"),
-                                rx.table.column_header_cell("% IRS"),
-                            )
+                    rx.box(
+                        rx.table.root(
+                            rx.table.header(
+                                rx.table.row(
+                                    rx.table.column_header_cell("Lanzador Relevista"),
+                                    rx.table.column_header_cell("Juegos"),
+                                    rx.table.column_header_cell("Total IR"),
+                                    rx.table.column_header_cell("Total IRS"),
+                                    rx.table.column_header_cell("% IRS"),
+                                )
+                            ),
+                            rx.table.body(
+                                rx.foreach(BullpenState.relievers_table_data, reliever_table_row)
+                            ),
+                            variant="surface",
+                            size="1",
+                            width="100%",
                         ),
-                        rx.table.body(
-                            rx.foreach(BullpenState.relievers_table_data, reliever_table_row)
-                        ),
-                        variant="surface",
-                        size="1",
+                        overflow_x="auto",
                         width="100%",
                     ),
                     spacing="3",
@@ -221,22 +225,26 @@ def bullpen_tab_view() -> rx.Component:
                     align="center",
                     width="100%",
                 ),
-                rx.table.root(
-                    rx.table.header(
-                        rx.table.row(
-                            rx.table.column_header_cell("Fecha"),
-                            rx.table.column_header_cell("Rival"),
-                            rx.table.column_header_cell("Inning"),
-                            rx.table.column_header_cell("Lanzador"),
-                            rx.table.column_header_cell("Heredados (IR)"),
-                            rx.table.column_header_cell("Anotaron (IRS)"),
-                        )
+                rx.box(
+                    rx.table.root(
+                        rx.table.header(
+                            rx.table.row(
+                                rx.table.column_header_cell("Fecha"),
+                                rx.table.column_header_cell("Rival"),
+                                rx.table.column_header_cell("Inning"),
+                                rx.table.column_header_cell("Lanzador"),
+                                rx.table.column_header_cell("Heredados (IR)"),
+                                rx.table.column_header_cell("Anotaron (IRS)"),
+                            )
+                        ),
+                        rx.table.body(
+                            rx.foreach(BullpenState.detailed_inherited_logs, inherited_log_row)
+                        ),
+                        variant="surface",
+                        size="1",
+                        width="100%",
                     ),
-                    rx.table.body(
-                        rx.foreach(BullpenState.detailed_inherited_logs, inherited_log_row)
-                    ),
-                    variant="surface",
-                    size="1",
+                    overflow_x="auto",
                     width="100%",
                 ),
                 spacing="3",
@@ -480,21 +488,25 @@ def lineups_tab_view() -> rx.Component:
                         rx.box(
                             rx.vstack(
                                 rx.heading("DESGLOSE DE RENDIMIENTO POR TURNO AL BATE", size="3", color=TEXT_PRIMARY),
-                                rx.table.root(
-                                    rx.table.header(
-                                        rx.table.row(
-                                            rx.table.column_header_cell("Turno"),
-                                            rx.table.column_header_cell("Titularidades"),
-                                            rx.table.column_header_cell("Victorias"),
-                                            rx.table.column_header_cell("Derrotas"),
-                                            rx.table.column_header_cell("% Victorias"),
-                                        )
+                                rx.box(
+                                    rx.table.root(
+                                        rx.table.header(
+                                            rx.table.row(
+                                                rx.table.column_header_cell("Turno"),
+                                                rx.table.column_header_cell("Titularidades"),
+                                                rx.table.column_header_cell("Victorias"),
+                                                rx.table.column_header_cell("Derrotas"),
+                                                rx.table.column_header_cell("% Victorias"),
+                                            )
+                                        ),
+                                        rx.table.body(
+                                            rx.foreach(BullpenState.player_order_breakdown, player_slot_row)
+                                        ),
+                                        variant="surface",
+                                        size="1",
+                                        width="100%",
                                     ),
-                                    rx.table.body(
-                                        rx.foreach(BullpenState.player_order_breakdown, player_slot_row)
-                                    ),
-                                    variant="surface",
-                                    size="1",
+                                    overflow_x="auto",
                                     width="100%",
                                 ),
                                 spacing="3",
