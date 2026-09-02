@@ -1,10 +1,23 @@
 ﻿:3000 {
-    root * /app/.web/build/client
-    encode gzip zstd
-    file_server
+    # 1. Reverse proxy backend endpoints (WebSockets, Eventos, Ping, Uploads)
+    handle /_event* {
+        reverse_proxy 127.0.0.1:8000
+    }
+    handle /ping* {
+        reverse_proxy 127.0.0.1:8000
+    }
+    handle /_upload* {
+        reverse_proxy 127.0.0.1:8000
+    }
+    handle /api* {
+        reverse_proxy 127.0.0.1:8000
+    }
 
-    @backend path /_event* /ping* /_upload* /api*
-    reverse_proxy @backend 127.0.0.1:8000
-
-    try_files {path} /__spa-fallback.html /index.html
+    # 2. Serve static frontend and SPA fallback
+    handle {
+        root * /app/.web/build/client
+        encode gzip zstd
+        try_files {path} /__spa-fallback.html /index.html
+        file_server
+    }
 }

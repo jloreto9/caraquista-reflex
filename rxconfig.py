@@ -2,6 +2,7 @@ import reflex as rx
 
 config = rx.Config(
     app_name="republicaraquistapp",
+    cors_allowed_origins=["*"],
     plugins=[
         rx.plugins.SitemapPlugin(),
         rx.plugins.RadixThemesPlugin(
