@@ -34,23 +34,32 @@ def get_current_season():
         return year - 1
 
 @cache_ttl(ttl_seconds=600)
-def get_available_seasons():
-    """Obtiene todas las temporadas disponibles en la base de datos"""
-    supabase = init_supabase()
+def get_available_seasons() -> List[int]:
+    """Obtiene todas las temporadas disponibles (Base de datos + Caché local + Histórico soportado)."""
+    supported_seasons = {2025, 2024, 2023, 2022}
 
+    # 1. Detectar archivos en caché local .cache/lvbp_season_{season}.json
+    cache_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".cache")
+    if os.path.exists(cache_dir):
+        for f in os.listdir(cache_dir):
+            if f.startswith("lvbp_season_") and f.endswith(".json"):
+                try:
+                    s_int = int(f.replace("lvbp_season_", "").replace(".json", ""))
+                    supported_seasons.add(s_int)
+                except ValueError:
+                    pass
+
+    # 2. Consultar Supabase
     try:
-        response = supabase.table('games') \
-            .select('season') \
-            .execute()
-
+        supabase = init_supabase()
+        response = supabase.table('games').select('season').execute()
         if response.data:
-            seasons = list(set([g['season'] for g in response.data if g.get('season')]))
-            if seasons:
-                return sorted(seasons, reverse=True)
-    except:
+            db_seasons = [g['season'] for g in response.data if g.get('season')]
+            supported_seasons.update(db_seasons)
+    except Exception:
         pass
 
-    return [2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018, 2017, 2016, 2015]
+    return sorted(list(supported_seasons), reverse=True)
 
 @cache_ttl(ttl_seconds=600)  # Cache por 10 minutos
 def get_standings(season=None, phase='regular'):
