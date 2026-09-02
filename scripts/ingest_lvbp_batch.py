@@ -121,7 +121,7 @@ class LVBPSupabaseBatchIngester:
 
         if self.client and not self.dry_run:
             try:
-                self.client.table("teams").upsert(teams_payload).execute()
+                self.client.table("teams").upsert(teams_payload, on_conflict="id").execute()
                 logger.info("Equipos sincronizados en tabla `teams`.")
             except Exception as e:
                 logger.warning(f"No se pudo hacer upsert en tabla `teams`: {e}")
@@ -256,7 +256,7 @@ class LVBPSupabaseBatchIngester:
             logger.info(f"Guardando {len(games_payload)} juegos en Supabase...")
             for chunk in chunk_list(games_payload, self.batch_size):
                 try:
-                    self.client.table("games").upsert(chunk).execute()
+                    self.client.table("games").upsert(chunk, on_conflict="id").execute()
                 except Exception as e:
                     logger.warning(f"Error al hacer upsert de lote de juegos: {e}")
 
@@ -276,6 +276,7 @@ class LVBPSupabaseBatchIngester:
         logger.info(f"Feeds descargados: {len(feeds_by_pk)} de {len(pks_to_fetch)} exitosos.")
 
         # 3. Procesar Bateo, Pitcheo, Fildeo, Bullpen, Lineups y WPA
+        players_records = []
         batting_records = []
         pitching_records = []
         fielding_records = []
@@ -306,7 +307,17 @@ class LVBPSupabaseBatchIngester:
                     p_name = p_info.get("person", {}).get("fullName", "Desconocido")
                     pos_abbr = p_info.get("position", {}).get("abbreviation", "")
                     bat_order = p_info.get("battingOrder")
+                    jersey = p_info.get("jerseyNumber", "")
                     stats = p_info.get("stats", {})
+
+                    if p_id:
+                        players_records.append({
+                            "id": p_id,
+                            "name": p_name,
+                            "team_id": t_id,
+                            "position": pos_abbr,
+                            "jersey_number": jersey,
+                        })
 
                     # Titulares (orden "100", "200", ..., "900")
                     if bat_order and str(bat_order).endswith("00"):
@@ -323,12 +334,8 @@ class LVBPSupabaseBatchIngester:
                     if b_stats and (b_stats.get("plateAppearances", 0) > 0 or b_stats.get("atBats", 0) > 0):
                         batting_records.append({
                             "game_id": pk,
-                            "season": season,
-                            "game_date": g_date,
-                            "team_id": t_id,
-                            "opponent_id": opp_id,
                             "player_id": p_id,
-                            "player_name": p_name,
+                            "team_id": t_id,
                             "ab": b_stats.get("atBats", 0),
                             "r": b_stats.get("runs", 0),
                             "h": b_stats.get("hits", 0),
@@ -349,26 +356,24 @@ class LVBPSupabaseBatchIngester:
                     p_stats = stats.get("pitching", {})
                     if p_stats and (p_stats.get("inningsPitched") or p_stats.get("numberOfPitches", 0) > 0):
                         ip_str = str(p_stats.get("inningsPitched", "0.0"))
+                        ip_parts = ip_str.split(".")
+                        ip_decimal = float(ip_parts[0]) + (float(ip_parts[1]) / 3.0 if len(ip_parts) > 1 else 0.0)
+
                         pitching_records.append({
                             "game_id": pk,
-                            "season": season,
-                            "game_date": g_date,
-                            "team_id": t_id,
-                            "opponent_id": opp_id,
                             "player_id": p_id,
-                            "player_name": p_name,
-                            "ip": ip_str,
+                            "team_id": t_id,
+                            "ip_string": ip_str,
+                            "ip_decimal": round(ip_decimal, 2),
                             "h": p_stats.get("hits", 0),
                             "r": p_stats.get("runs", 0),
                             "er": p_stats.get("earnedRuns", 0),
                             "bb": p_stats.get("baseOnBalls", 0),
                             "so": p_stats.get("strikeOuts", 0),
                             "hr": p_stats.get("homeRuns", 0),
-                            "w": 1 if p_stats.get("wins", 0) > 0 else 0,
-                            "l": 1 if p_stats.get("losses", 0) > 0 else 0,
-                            "sv": 1 if p_stats.get("saves", 0) > 0 else 0,
-                            "hld": p_stats.get("holds", 0),
-                            "bs": p_stats.get("blownSaves", 0),
+                            "hbp": p_stats.get("hitBatsmen", 0),
+                            "wp": p_stats.get("wildPitches", 0),
+                            "bk": p_stats.get("balks", 0),
                         })
 
                     # Fildeo individual
@@ -451,17 +456,27 @@ class LVBPSupabaseBatchIngester:
 
         # 4. Inserción en Supabase por lotes
         if self.client and not self.dry_run:
+            # Upsert de Jugadores únicos
+            unique_players = {p["id"]: p for p in players_records}.values()
+            if unique_players:
+                logger.info(f"Guardando {len(unique_players)} jugadores en Supabase...")
+                for chunk in chunk_list(list(unique_players), self.batch_size):
+                    try:
+                        self.client.table("players").upsert(chunk, on_conflict="id").execute()
+                    except Exception as e:
+                        logger.warning(f"Error al insertar lote de jugadores: {e}")
+
             logger.info(f"Guardando {len(batting_records)} registros de Bateo en Supabase...")
             for chunk in chunk_list(batting_records, self.batch_size):
                 try:
-                    self.client.table("batting_stats").upsert(chunk).execute()
+                    self.client.table("batting_stats").upsert(chunk, on_conflict="game_id,player_id").execute()
                 except Exception as e:
                     logger.warning(f"Error al insertar lote de bateo: {e}")
 
             logger.info(f"Guardando {len(pitching_records)} registros de Pitcheo en Supabase...")
             for chunk in chunk_list(pitching_records, self.batch_size):
                 try:
-                    self.client.table("pitching_stats").upsert(chunk).execute()
+                    self.client.table("pitching_stats").upsert(chunk, on_conflict="game_id,player_id").execute()
                 except Exception as e:
                     logger.warning(f"Error al insertar lote de pitcheo: {e}")
 
@@ -497,7 +512,8 @@ class LVBPSupabaseBatchIngester:
 def main():
     parser = argparse.ArgumentParser(description="Pipeline de Ingesta por Lotes para la LVBP.")
     parser.add_argument("--season", type=int, default=2025, help="Temporada a ingerir (ej: 2025 para 2025-2026).")
-    parser.add_argument("--all-seasons", action="store_true", help="Ingerir temporadas 2023, 2024 y 2025.")
+    parser.add_argument("--seasons", nargs="+", type=int, default=None, help="Lista de temporadas a ingerir (ej: --seasons 2022 2023 2024 2025).")
+    parser.add_argument("--all-seasons", action="store_true", help="Ingerir las últimas 4 temporadas: 2022, 2023, 2024 y 2025.")
     parser.add_argument("--batch-size", type=int, default=200, help="Tamaño de lote para upserts en Supabase.")
     parser.add_argument("--dry-run", action="store_true", help="Ejecutar sin escribir en Supabase.")
     parser.add_argument("--with-pbp", action="store_true", help="Procesar feed detallado y Play-by-Play.")
@@ -506,7 +522,13 @@ def main():
 
     ingester = LVBPSupabaseBatchIngester(dry_run=args.dry_run, batch_size=args.batch_size)
 
-    seasons = [2023, 2024, 2025] if args.all_seasons else [args.season]
+    if args.seasons:
+        seasons = args.seasons
+    elif args.all_seasons:
+        seasons = [2022, 2023, 2024, 2025]
+    else:
+        seasons = [args.season]
+
     for s in seasons:
         ingester.process_season(s, with_pbp=args.with_pbp)
 
