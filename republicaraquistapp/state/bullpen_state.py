@@ -277,31 +277,33 @@ class BullpenState(AppState):
         }
 
         for item in lineups_data:
-            g_date = item["game_date"]
-            opp = item["opposing_team"]
-            won = item["leones_won"]
+            g_date = item.get("game_date", "")
+            opp = item.get("opposing_team") or LVBP_TEAMS.get(item.get("opponent_id", 0), "Rival")
+            won = bool(item.get("leones_won", item.get("won", 0) == 1))
             score_leo = item.get("leones_score", 0)
             score_opp = item.get("opposing_score", 0)
             score_str = item.get("score_str", f"{score_leo}-{score_opp}")
             full_score = item.get("full_score_str", f"Leones {score_leo} - {score_opp} {opp}")
             starters = item.get("starters", [])
+            g_pk = item.get("game_pk", item.get("game_id", 0))
 
             # Agregar nombre completo y color de badge a cada titular
             formatted_starters = []
             for s in starters:
-                ord_num = s["order"]
+                ord_num = s.get("order", 1)
                 b_col = "#3b82f6" if ord_num <= 3 else ("#f59e0b" if ord_num == 4 else "#8b5cf6")
+                p_pos = s.get("position", "-")
                 formatted_starters.append({
                     "order": ord_num,
                     "order_str": f"#{ord_num}",
-                    "player_name": s["player_name"],
-                    "position": s["position"],
-                    "position_full": f"{s['position']} • {pos_full_map.get(s['position'], s['position'])}",
+                    "player_name": s.get("player_name", "Desconocido"),
+                    "position": p_pos,
+                    "position_full": f"{p_pos} • {pos_full_map.get(p_pos, p_pos)}",
                     "badge_color": b_col
                 })
 
             game_entry = {
-                "game_pk": item["game_pk"],
+                "game_pk": g_pk,
                 "game_date": g_date,
                 "opposing_team": opp,
                 "won": 1 if won else 0,
@@ -314,10 +316,10 @@ class BullpenState(AppState):
 
             for s in starters:
                 starters_flat.append({
-                    "Jugador": s["player_name"],
-                    "Turno_Num": s["order"],
-                    "Turno": f"{s['order']}º Bate",
-                    "Posicion": s["position"],
+                    "Jugador": s.get("player_name", "Desconocido"),
+                    "Turno_Num": s.get("order", 1),
+                    "Turno": f"{s.get('order', 1)}º Bate",
+                    "Posicion": s.get("position", "-"),
                     "game_date": g_date,
                     "opposing_team": opp,
                     "Marcador": score_str,
@@ -441,9 +443,9 @@ class BullpenState(AppState):
             return
 
         for item in lineups_data:
-            g_date = item["game_date"]
-            opp = item["opposing_team"]
-            won = item["leones_won"]
+            g_date = item.get("game_date", "")
+            opp = item.get("opposing_team") or LVBP_TEAMS.get(item.get("opponent_id", 0), "Rival")
+            won = bool(item.get("leones_won", item.get("won", 0) == 1))
             score_leo = item.get("leones_score", 0)
             score_opp = item.get("opposing_score", 0)
             score_str = item.get("score_str", f"{score_leo}-{score_opp}")
@@ -506,18 +508,18 @@ class BullpenState(AppState):
 
         starters_flat = []
         for item in lineups_data:
-            g_date = item["game_date"]
-            opp = item["opposing_team"]
-            won = item["leones_won"]
+            g_date = item.get("game_date", "")
+            opp = item.get("opposing_team") or LVBP_TEAMS.get(item.get("opponent_id", 0), "Rival")
+            won = bool(item.get("leones_won", item.get("won", 0) == 1))
             score_leo = item.get("leones_score", 0)
             score_opp = item.get("opposing_score", 0)
             score_str = item.get("score_str", f"{score_leo}-{score_opp}")
             for s in item.get("starters", []):
                 starters_flat.append({
-                    "Jugador": s["player_name"],
-                    "Turno_Num": s["order"],
-                    "Turno": f"{s['order']}º Bate",
-                    "Posicion": s["position"],
+                    "Jugador": s.get("player_name", "Desconocido"),
+                    "Turno_Num": s.get("order", 1),
+                    "Turno": f"{s.get('order', 1)}º Bate",
+                    "Posicion": s.get("position", "-"),
                     "game_date": g_date,
                     "opposing_team": opp,
                     "Marcador": score_str,

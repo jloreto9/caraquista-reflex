@@ -398,12 +398,38 @@ class LVBPSupabaseBatchIngester:
 
                 if starters:
                     starters.sort(key=lambda x: x["order"])
+                    h_name = LVBP_TEAMS.get(h_id, "Home")
+                    a_name = LVBP_TEAMS.get(a_id, "Away")
+                    opp_name = a_name if side == "home" else h_name
+                    is_home = (side == "home")
+
+                    # Scores
+                    linescore = live.get("linescore", {})
+                    teams_ls = linescore.get("teams", {})
+                    h_score = teams_ls.get("home", {}).get("runs", 0)
+                    a_score = teams_ls.get("away", {}).get("runs", 0)
+                    team_score = h_score if is_home else a_score
+                    opp_score = a_score if is_home else h_score
+                    is_won = (team_score > opp_score)
+                    score_str = f"{team_score}-{opp_score}"
+                    full_score_str = f"{LVBP_ABBR.get(t_id, 'LEO')} {team_score} - {opp_score} {LVBP_ABBR.get(opp_id, 'OPP')}"
+
                     lineup_records.append({
+                        "game_pk": pk,
                         "game_id": pk,
                         "season": season,
                         "game_date": g_date,
                         "team_id": t_id,
                         "opponent_id": opp_id,
+                        "home_team": h_name,
+                        "away_team": a_name,
+                        "opposing_team": opp_name,
+                        "is_home": is_home,
+                        "leones_score": team_score,
+                        "opposing_score": opp_score,
+                        "leones_won": is_won,
+                        "score_str": score_str,
+                        "full_score_str": full_score_str,
                         "starters": starters,
                     })
 
@@ -417,6 +443,7 @@ class LVBPSupabaseBatchIngester:
                 inning = about.get("inning", 1)
                 half = about.get("halfInning", "top")
                 pitcher_team_id = h_id if half == "top" else a_id
+                opp_team_name = LVBP_TEAMS.get(a_id if half == "top" else h_id, "Rival")
                 matchup = play.get("matchup", {})
                 pitcher = matchup.get("pitcher", {})
                 p_id = pitcher.get("id")
@@ -443,10 +470,12 @@ class LVBPSupabaseBatchIngester:
                                         irs_count += 1
 
                         bullpen_records.append({
+                            "game_pk": pk,
                             "game_id": pk,
                             "season": season,
                             "game_date": g_date,
                             "team_id": pitcher_team_id,
+                            "opposing_team": opp_team_name,
                             "pitcher_id": p_id,
                             "pitcher_name": p_name,
                             "inning": inning,
