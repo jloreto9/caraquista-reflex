@@ -38,7 +38,7 @@ NAV_ITEMS: List[Dict[str, str]] = [
         "route": "/",
         "label": "Dashboard",
         "icon": "layout-dashboard",
-        "desc": "Resumen Ejecutivo y Scoreboard",
+        "desc": "Resumen de Temporada y Scoreboard",
     },
     {
         "route": "/standings",

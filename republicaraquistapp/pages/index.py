@@ -33,14 +33,14 @@ from republicaraquistapp.components.layout import layout
 from republicaraquistapp.components.scoreboard import scoreboard_card
 
 
-def executive_kpi_card(
+def team_kpi_card(
     title: str,
     value: Any,
     subtitle: str,
     icon_name: str,
     badge_text: Optional[str] = None,
 ) -> rx.Component:
-    """Tarjeta individual para la cuadrícula ejecutiva de KPIs."""
+    """Tarjeta individual para los KPIs clave de Leones del Caracas."""
     return rx.box(
         rx.hstack(
             rx.vstack(
@@ -75,34 +75,34 @@ def executive_kpi_card(
     )
 
 
-def executive_kpi_grid() -> rx.Component:
+def team_kpi_grid() -> rx.Component:
     """Rejilla con los 5 KPIs primarios del conjunto caraquista."""
     return rx.grid(
-        executive_kpi_card(
+        team_kpi_card(
             title="POSICIÓN TABLA",
             value=StandingsState.leones_kpis["posicion"],
             subtitle="Ronda Regular LVBP",
             icon_name="trophy",
         ),
-        executive_kpi_card(
+        team_kpi_card(
             title="RÉCORD W - L",
             value=StandingsState.leones_kpis["record"],
             subtitle=f"PCT: {StandingsState.leones_kpis['pct']}",
             icon_name="chart-bar",
         ),
-        executive_kpi_card(
+        team_kpi_card(
             title="DIF. CARRERAS",
             value=StandingsState.leones_kpis["run_diff"],
             subtitle=f"CF: {StandingsState.leones_kpis['rf']} | CP: {StandingsState.leones_kpis['ra']}",
             icon_name="scale",
         ),
-        executive_kpi_card(
+        team_kpi_card(
             title="RACHA & L10",
             value=StandingsState.leones_kpis["streak"],
             subtitle=f"Últimos 10: {StandingsState.leones_kpis['l10']}",
             icon_name="flame",
         ),
-        executive_kpi_card(
+        team_kpi_card(
             title="RATING ELO",
             value=StandingsState.leones_elo_stats["elo"],
             subtitle=f"Puesto {StandingsState.leones_elo_stats['rank']} • Base 1500",
@@ -112,6 +112,11 @@ def executive_kpi_grid() -> rx.Component:
         spacing="4",
         width="100%",
     )
+
+
+# Alias de compatibilidad
+executive_kpi_grid = team_kpi_grid
+executive_kpi_card = team_kpi_card
 
 
 def recent_game_item(game: dict) -> rx.Component:
@@ -446,52 +451,12 @@ def standings_preview_card() -> rx.Component:
 
 
 def index_content() -> rx.Component:
-    """Cuerpo principal del Dashboard Ejecutivo (/)."""
+    """Cuerpo principal de la vista de Resumen de Temporada (/)."""
     return rx.vstack(
-        # 1. Banner de Bienvenida y Propósito
-        rx.box(
-            rx.hstack(
-                rx.vstack(
-                    rx.hstack(
-                        rx.box(
-                            width="4px",
-                            height="32px",
-                            background=ACCENT_GOLD,
-                            border_radius="2px",
-                        ),
-                        rx.heading(
-                            "DASHBOARD EJECUTIVO SABERMÉTRICO",
-                            size="6",
-                            color=TEXT_PRIMARY,
-                            font_weight="800",
-                            letter_spacing="0.02em",
-                        ),
-                        align="center",
-                        spacing="3",
-                    ),
-                    rx.text(
-                        "Seguimiento analítico en tiempo real, probabilidades y modelos de última "
-                        "generación para los Leones del Caracas en la LVBP.",
-                        size="2",
-                        color=TEXT_MUTED,
-                        padding_left="1rem",
-                    ),
-                    spacing="1",
-                    align="start",
-                ),
-                rx.spacer(),
-                rx.badge("Ronda Regular", style=GOLD_BADGE_STYLE),
-                align="center",
-                width="100%",
-            ),
-            padding_bottom="0.5rem",
-            width="100%",
-        ),
+        # 1. Rejilla de KPIs Principales del Equipo
+        team_kpi_grid(),
 
-        # 2. Rejilla Ejecutiva de KPIs Principales
-        executive_kpi_grid(),
-
-        # 3. Grilla Principal de 2 Columnas
+        # 2. Grilla Principal de 2 Columnas
         rx.grid(
             # Columna Izquierda: Scoreboard y Juegos Recientes
             rx.vstack(
@@ -541,7 +506,7 @@ def index_content() -> rx.Component:
             width="100%",
         ),
 
-        # 4. Tabla de Posiciones Oficial Completa / Previa
+        # 3. Tabla de Posiciones Oficial Completa / Previa
         standings_preview_card(),
 
         spacing="5",
@@ -553,7 +518,7 @@ def index() -> rx.Component:
     """Página principal de República Caraquista en Reflex con Layout Global."""
     return layout(
         content=index_content(),
-        page_title="Dashboard Ejecutivo Sabermétrico",
-        page_description="Panel de control analítico, métricas de rendimiento y seguimiento de los Leones del Caracas.",
+        page_title="Resumen de Temporada",
+        page_description="Seguimiento en tiempo real, marcadores y analítica sabermétrica de los Leones del Caracas.",
         current_route="/",
     )
