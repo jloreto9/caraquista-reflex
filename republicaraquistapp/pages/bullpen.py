@@ -76,25 +76,92 @@ def starter_item_card(s: Dict[str, Any]) -> rx.Component:
     )
 
 
-def top_lineup_item(lu: Dict[str, Any]) -> rx.Component:
-    """Elemento para la lista de alineaciones más frecuentes."""
+def starter_slot_chip(name: str, pos: str, order: str, color_scheme: str) -> rx.Component:
+    """Chip individual para un bateador titular en su turno al bate."""
     return rx.box(
-        rx.vstack(
-            rx.hstack(
-                rx.badge(lu["rank_str"], color_scheme="amber", variant="solid", size="1"),
-                rx.text(lu["summary"], size="2", font_weight="700", color=TEXT_PRIMARY),
-                rx.spacer(),
-                align="center",
-                width="100%",
+        rx.hstack(
+            rx.badge(
+                order,
+                color_scheme=color_scheme,
+                variant="solid",
+                size="1",
+                font_weight="800",
             ),
-            rx.text(lu["preview"], size="1", color=TEXT_MUTED),
+            rx.vstack(
+                rx.text(name, size="2", font_weight="700", color=TEXT_PRIMARY, line_clamp=1),
+                rx.text(pos, size="1", font_weight="600", color=ACCENT_GOLD),
+                spacing="0",
+                align_items="start",
+            ),
+            align="center",
             spacing="2",
             width="100%",
         ),
-        padding="12px 16px",
-        background="rgba(255, 255, 255, 0.03)",
+        padding="8px 12px",
+        background="rgba(15, 23, 42, 0.65)",
         border="1px solid rgba(255, 255, 255, 0.08)",
         border_radius="8px",
+        width="100%",
+    )
+
+
+def top_lineup_item(lu: Dict[str, Any]) -> rx.Component:
+    """Tarjeta ejecutiva para combinaciones de alineación más utilizadas con orden 1 al 9 y partidos."""
+    return rx.box(
+        rx.vstack(
+            # Encabezado: Ranking, Frecuencia y Récord
+            rx.hstack(
+                rx.hstack(
+                    rx.badge(lu["rank_str"], color_scheme="amber", variant="solid", size="2", font_weight="800"),
+                    rx.badge(lu["games_label"], color_scheme="blue", variant="surface", size="2", font_weight="700"),
+                    align="center",
+                    spacing="2",
+                ),
+                rx.spacer(),
+                rx.hstack(
+                    rx.badge(lu["record_str"], color_scheme="green", variant="surface", size="2", font_weight="800"),
+                    rx.badge(f"{lu['pct_str']} PCT", color_scheme="amber", variant="soft", size="2", font_weight="800"),
+                    align="center",
+                    spacing="2",
+                ),
+                align="center",
+                width="100%",
+            ),
+            # Grilla 3x3 de los 9 bateadores titulares (Orden 1 al 9)
+            rx.grid(
+                starter_slot_chip(lu["s1_name"], lu["s1_pos"], lu["s1_order"], lu["s1_color"]),
+                starter_slot_chip(lu["s2_name"], lu["s2_pos"], lu["s2_order"], lu["s2_color"]),
+                starter_slot_chip(lu["s3_name"], lu["s3_pos"], lu["s3_order"], lu["s3_color"]),
+                starter_slot_chip(lu["s4_name"], lu["s4_pos"], lu["s4_order"], lu["s4_color"]),
+                starter_slot_chip(lu["s5_name"], lu["s5_pos"], lu["s5_order"], lu["s5_color"]),
+                starter_slot_chip(lu["s6_name"], lu["s6_pos"], lu["s6_order"], lu["s6_color"]),
+                starter_slot_chip(lu["s7_name"], lu["s7_pos"], lu["s7_order"], lu["s7_color"]),
+                starter_slot_chip(lu["s8_name"], lu["s8_pos"], lu["s8_order"], lu["s8_color"]),
+                starter_slot_chip(lu["s9_name"], lu["s9_pos"], lu["s9_order"], lu["s9_color"]),
+                columns=rx.breakpoints(initial="1", sm="2", md="3"),
+                spacing="2",
+                width="100%",
+            ),
+            # Juegos disputados con esta alineación
+            rx.cond(
+                lu["games_detail"] != "",
+                rx.hstack(
+                    rx.icon("calendar", size=14, color=TEXT_MUTED),
+                    rx.text(lu["games_detail"], size="1", color=TEXT_MUTED),
+                    align="center",
+                    spacing="2",
+                    width="100%",
+                ),
+                rx.fragment(),
+            ),
+            spacing="3",
+            width="100%",
+        ),
+        padding="16px",
+        background="rgba(13, 21, 43, 0.85)",
+        border="1px solid rgba(253, 184, 39, 0.2)",
+        border_radius="10px",
+        box_shadow="0 4px 20px rgba(0, 0, 0, 0.3)",
         width="100%",
     )
 

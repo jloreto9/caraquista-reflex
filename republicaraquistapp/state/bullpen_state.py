@@ -366,6 +366,7 @@ class BullpenState(AppState):
                     "games_count": 0,
                     "wins": 0,
                     "losses": 0,
+                    "games_list": [],
                     "starters": sorted(starters, key=lambda x: x["order"])
                 }
             is_w = (g["won"] == 1)
@@ -375,17 +376,47 @@ class BullpenState(AppState):
             else:
                 lineup_groups[key]["losses"] += 1
 
+            sym = "✅ V" if is_w else "❌ D"
+            lineup_groups[key]["games_list"].append({
+                "date": g.get("game_date", ""),
+                "opp": g.get("opposing_team", ""),
+                "score": g.get("score_str", ""),
+                "won": is_w,
+                "label": f"{g.get('game_date', '')} vs {g.get('opposing_team', '')} ({sym} {g.get('score_str', '')})"
+            })
+
         sorted_lu = sorted(lineup_groups.values(), key=lambda x: (x["games_count"], x["wins"]), reverse=True)
         top_list = []
         for idx, item in enumerate(sorted_lu[:10], 1):
             pct = item["wins"] / item["games_count"] if item["games_count"] > 0 else 0
-            s_preview = ", ".join([f"{s['order']}. {s['player_name']}" for s in item["starters"][:4]]) + "..."
-            top_list.append({
+            
+            lineup_dict = {
                 "rank_str": f"Alineación #{idx}",
-                "summary": f"{item['games_count']} JJ • {item['wins']}V - {item['losses']}D (.{int(pct*1000):03d} PCT)",
-                "preview": s_preview,
-                "starters": item["starters"],
-            })
+                "games_count": item["games_count"],
+                "wins": item["wins"],
+                "losses": item["losses"],
+                "pct_str": f".{int(pct*1000):03d}",
+                "record_str": f"{item['wins']}V - {item['losses']}D",
+                "games_label": f"{item['games_count']} {'Juegos' if item['games_count'] > 1 else 'Juego'}",
+                "games_detail": " • ".join([g["label"] for g in item["games_list"][:3]]),
+            }
+
+            for slot_idx in range(1, 10):
+                if slot_idx <= len(item["starters"]):
+                    st = item["starters"][slot_idx - 1]
+                    p_name = st["player_name"]
+                    p_pos = st["position"]
+                else:
+                    p_name = "Vacante"
+                    p_pos = "-"
+                
+                b_col = "blue" if slot_idx <= 3 else ("amber" if slot_idx == 4 else ("purple" if slot_idx <= 6 else "slate"))
+                lineup_dict[f"s{slot_idx}_name"] = p_name
+                lineup_dict[f"s{slot_idx}_pos"] = p_pos
+                lineup_dict[f"s{slot_idx}_order"] = f"#{slot_idx}"
+                lineup_dict[f"s{slot_idx}_color"] = b_col
+
+            top_list.append(lineup_dict)
         self.top_frequent_lineups = top_list
 
         # 3. Matriz de Calor
