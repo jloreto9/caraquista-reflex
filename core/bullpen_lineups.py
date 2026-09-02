@@ -1,6 +1,7 @@
+import os
+import json
 from typing import Any, Dict, List, Optional, Tuple
 from core.cache import cache_ttl
-# utils/bullpen_lineups.py
 import requests
 import pandas as pd
 import numpy as np
@@ -143,7 +144,27 @@ def parse_game_bullpen_and_lineups(game_pk: int) -> dict:
 
 @cache_ttl(ttl_seconds=600)
 def fetch_season_bullpen_and_lineups(season: int, team_id: int = LEONES_TEAM_ID, cache_version: str = "v2_with_scores") -> tuple[pd.DataFrame, list]:
-    """Descarga datos de bullpen y lineups de toda la temporada."""
+    """Descarga datos de bullpen y lineups de toda la temporada (con soporte de snapshot pre-ingerido)."""
+    # 1. Intentar cargar desde snapshot pre-ingerido si existe
+    cache_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".cache", f"lvbp_season_{season}.json")
+    if os.path.exists(cache_path):
+        try:
+            with open(cache_path, "r", encoding="utf-8") as f:
+                cached = json.load(f)
+            bp_list = cached.get("bullpen_records", [])
+            lu_list = cached.get("lineup_records", [])
+            if bp_list or lu_list:
+                df_bp = pd.DataFrame(bp_list) if bp_list else pd.DataFrame()
+                # Filtrar por team_id si aplica
+                if not df_bp.empty and "team_id" in df_bp.columns:
+                    df_bp = df_bp[df_bp["team_id"] == team_id]
+                filtered_lu = [lu for lu in lu_list if lu.get("team_id") == team_id] if lu_list else []
+                if not df_bp.empty or filtered_lu:
+                    return df_bp, filtered_lu
+        except Exception:
+            pass
+
+    # 2. Fallback a descarga concurrente desde MLB Stats API
     sched_url = f"https://statsapi.mlb.com/api/v1/schedule?sportId=17&leagueId=135&season={season}&teamId={team_id}"
     try:
         res = requests.get(sched_url, timeout=30)
