@@ -553,5 +553,58 @@ class TestSupabaseClientLeaguePoolContract(unittest.TestCase):
         self.assertEqual(df.loc[df["player_id"] == 2, "team_abbr"].values[0], "MAG")
 
 
+class TestMatchup360CardImageExport(unittest.TestCase):
+    """Verifica la generación de la tarjeta gráfica Matchup 360 (PNG) y créditos."""
+
+    def test_build_matchup_image_png_header(self):
+        """La función build_matchup_image debe generar bytes de PNG válidos."""
+        from core.matchup_card import build_matchup_image
+
+        p1 = {"name": "José Rondón", "badge": "CAR", "pos": "OF", "headshot": None, "team_logo": None}
+        p2 = {"name": "Renato Núñez", "badge": "MAG", "pos": "1B", "headshot": None, "team_logo": None}
+        rows = [
+            {"category": "Ofensiva", "metric": "wOBA", "val_1": ".412", "val_2": ".395", "winner": "José Rondón (CAR)", "is_header": False},
+            {"category": "Ofensiva", "metric": "wRC+", "val_1": "155", "val_2": "142", "winner": "José Rondón (CAR)", "is_header": False},
+            {"category": "Volumen", "metric": "HR", "val_1": "12", "val_2": "14", "winner": "Renato Núñez (MAG)", "is_header": False},
+        ]
+        png_bytes = build_matchup_image(p1, p2, rows, is_batter=True, season=2025)
+        self.assertIsInstance(png_bytes, bytes)
+        self.assertTrue(len(png_bytes) > 5000)
+        # Magic bytes oficiales de formato PNG (\x89PNG\r\n\x1a\n)
+        self.assertEqual(png_bytes[:8], b"\x89PNG\r\n\x1a\n")
+
+    def test_download_matchup_card_event_spec(self):
+        """IndividualesState.download_matchup_card() debe retornar un EventSpec de descarga de Reflex."""
+        state = IndividualesState()
+        state.batting_data_raw = [
+            {
+                "player_id": 1, "player_name": "José Rondón", "team_id": 695, "team_abbr": "CAR",
+                "team_name": "Leones del Caracas", "headshot": "", "role": "Bateador", "pos": "OF",
+                "ab": 120, "pa": 140, "h": 40, "h_1b": 24, "h_2b": 8, "h_3b": 1, "hr": 7, "rbi": 28,
+                "r": 25, "bb": 18, "so": 22, "hbp": 1, "sf": 1, "sb": 3, "cs": 1,
+                "avg": 0.333, "avg_str": ".333", "obp": 0.420, "obp_str": ".420", "slg": 0.592, "slg_str": ".592",
+                "ops": 1.012, "ops_str": "1.012", "iso": 0.258, "iso_str": ".258", "babip": 0.363, "babip_str": ".363",
+                "woba": 0.435, "woba_str": ".435", "wrc_plus": 165, "bb_pct": 12.9, "bb_pct_str": "12.9%", "k_pct": 15.7, "k_pct_str": "15.7%",
+            },
+            {
+                "player_id": 2, "player_name": "Renato Núñez", "team_id": 696, "team_abbr": "MAG",
+                "team_name": "Navegantes del Magallanes", "headshot": "", "role": "Bateador", "pos": "1B",
+                "ab": 130, "pa": 150, "h": 42, "h_1b": 22, "h_2b": 9, "h_3b": 0, "hr": 11, "rbi": 35,
+                "r": 27, "bb": 16, "so": 28, "hbp": 2, "sf": 2, "sb": 0, "cs": 0,
+                "avg": 0.323, "avg_str": ".323", "obp": 0.400, "obp_str": ".400", "slg": 0.654, "slg_str": ".654",
+                "ops": 1.054, "ops_str": "1.054", "iso": 0.331, "iso_str": ".331", "babip": 0.341, "babip_str": ".341",
+                "woba": 0.442, "woba_str": ".442", "wrc_plus": 170, "bb_pct": 10.7, "bb_pct_str": "10.7%", "k_pct": 18.7, "k_pct_str": "18.7%",
+            }
+        ]
+        state.selected_player_1 = "José Rondón (CAR)"
+        state.selected_player_2 = "Renato Núñez (MAG)"
+        state.update_h2h_comparison()
+
+        event = state.download_matchup_card()
+        self.assertIsNotNone(event)
+        self.assertIn("EventSpec", type(event).__name__)
+
+
 if __name__ == "__main__":
     unittest.main()
+

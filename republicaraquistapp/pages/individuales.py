@@ -877,19 +877,43 @@ def comparator_tab_view() -> rx.Component:
             spacing="4",
             width="100%",
         ),
-        # Tarjeta de Veredicto Sabermétrico
+        # Tarjeta de Exportación de Tarjeta Gráfica Matchup 360 (PNG)
         rx.box(
             rx.hstack(
-                rx.icon("award", size=24, color=ACCENT_GOLD),
-                rx.text(
-                    IndividualesState.h2h_verdict,
+                rx.vstack(
+                    rx.hstack(
+                        rx.icon("image-down", size=22, color=ACCENT_GOLD),
+                        rx.heading("Exportar Tarjeta Gráfica Matchup 360 (PNG)", size="3", font_weight="800", color=TEXT_PRIMARY),
+                        align="center",
+                        spacing="2",
+                    ),
+                    rx.text(
+                        "Genera y descarga en alta definición la tarjeta gráfica oficial con fotos oficiales, escudos, métricas 360° y créditos sabermétricos lista para compartir:",
+                        size="2",
+                        color=TEXT_MUTED,
+                    ),
+                    spacing="1",
+                    align="start",
+                ),
+                rx.spacer(),
+                rx.button(
+                    rx.hstack(
+                        rx.icon("download", size=18),
+                        rx.text("Descargar Tarjeta PNG", font_weight="700"),
+                        align="center",
+                        spacing="2",
+                    ),
+                    on_click=IndividualesState.download_matchup_card,
+                    style=BUTTON_PRIMARY_STYLE,
                     size="3",
-                    font_weight="700",
-                    color=TEXT_PRIMARY,
+                    cursor="pointer",
+                    loading=IndividualesState.is_generating_card,
                 ),
                 align="center",
-                spacing="3",
                 width="100%",
+                padding_y="0.25rem",
+                spacing="4",
+                wrap="wrap",
             ),
             style=CARD_STYLE,
             border=f"1px solid {BORDER_GOLD}",

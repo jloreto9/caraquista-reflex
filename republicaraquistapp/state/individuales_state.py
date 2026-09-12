@@ -25,7 +25,9 @@ from core.supabase_client import (
     get_current_season,
 )
 from core.teams import get_team_logo, get_team_abbr, get_team_name
+from core.matchup_card import build_matchup_image
 from republicaraquistapp.state.base_state import AppState
+
 
 
 def _safe_int(val, default: int = 0) -> int:
@@ -159,6 +161,7 @@ class IndividualesState(AppState):
         "kpi_1": "-", "kpi_2": "-", "kpi_3": "-"
     }
     h2h_verdict: str = "Seleccione dos jugadores para generar el veredicto sabermétrico."
+    is_generating_card: bool = False
 
     # ── Handler Principal on_load ───────────────────────────────────────────────
     def on_load(self):
@@ -660,6 +663,27 @@ class IndividualesState(AppState):
         self.selected_player_2 = val
         self.update_h2h_comparison()
 
+    def download_matchup_card(self):
+        """Genera y descarga la tarjeta gráfica Matchup 360 en formato PNG."""
+        self.is_generating_card = True
+        try:
+            is_batter = (self.compare_type == "Bateadores")
+            season = self.selected_season
+            png_bytes = build_matchup_image(
+                player_1=self.player_1_card,
+                player_2=self.player_2_card,
+                h2h_rows=self.h2h_rows,
+                is_batter=is_batter,
+                season=season,
+            )
+            safe1 = "".join(c for c in str(self.selected_player_1) if c.isalnum() or c in (" ", "_")).strip().replace(" ", "_") or "Jugador1"
+            safe2 = "".join(c for c in str(self.selected_player_2) if c.isalnum() or c in (" ", "_")).strip().replace(" ", "_") or "Jugador2"
+            filename = f"LVBP360_Matchup_{safe1}_vs_{safe2}_{season}.png"
+            return rx.download(data=png_bytes, filename=filename, mime_type="image/png")
+        finally:
+            self.is_generating_card = False
+
+
     @rx.var
     def available_batters_p1(self) -> List[str]:
         return self._get_team_player_names(self.comparator_team_1, is_batter=True)
@@ -852,12 +876,22 @@ class IndividualesState(AppState):
                 "kpi_3": f"{p2['hr']} HR",
             }
 
-            d1_1 = max(0, p1["h"] - p1["doubles"] - p1["triples"] - p1["hr"])
-            d1_2 = max(0, p2["h"] - p2["doubles"] - p2["triples"] - p2["hr"])
-            tb1 = d1_1 + 2 * p1["doubles"] + 3 * p1["triples"] + 4 * p1["hr"]
-            tb2 = d1_2 + 2 * p2["doubles"] + 3 * p2["triples"] + 4 * p2["hr"]
-            xbh1 = p1["doubles"] + p1["triples"] + p1["hr"]
-            xbh2 = p2["doubles"] + p2["triples"] + p2["hr"]
+            d1 = p1.get("doubles", p1.get("h_2b", 0))
+            t1 = p1.get("triples", p1.get("h_3b", 0))
+            h1 = p1.get("h", 0)
+            hr1 = p1.get("hr", 0)
+            d1_1 = max(0, h1 - d1 - t1 - hr1)
+
+            d2 = p2.get("doubles", p2.get("h_2b", 0))
+            t2 = p2.get("triples", p2.get("h_3b", 0))
+            h2 = p2.get("h", 0)
+            hr2 = p2.get("hr", 0)
+            d1_2 = max(0, h2 - d2 - t2 - hr2)
+
+            tb1 = d1_1 + 2 * d1 + 3 * t1 + 4 * hr1
+            tb2 = d1_2 + 2 * d2 + 3 * t2 + 4 * hr2
+            xbh1 = d1 + t1 + hr1
+            xbh2 = d2 + t2 + hr2
 
             # Baserunning
             sb1, cs1 = p1.get("sb", 0), p1.get("cs", 0)
@@ -891,9 +925,9 @@ class IndividualesState(AppState):
                 ("🔢 Estadísticas de Volumen", "Turnos al Bate (AB)", str(p1["ab"]), str(p2["ab"]), p1["ab"] > p2["ab"], p2["ab"] > p1["ab"]),
                 ("🔢 Estadísticas de Volumen", "Hits (H)", str(p1["h"]), str(p2["h"]), p1["h"] > p2["h"], p2["h"] > p1["h"]),
                 ("🔢 Estadísticas de Volumen", "Sencillos (1B)", str(d1_1), str(d1_2), d1_1 > d1_2, d1_2 > d1_1),
-                ("🔢 Estadísticas de Volumen", "Dobles (2B)", str(p1["doubles"]), str(p2["doubles"]), p1["doubles"] > p2["doubles"], p2["doubles"] > p1["doubles"]),
-                ("🔢 Estadísticas de Volumen", "Triples (3B)", str(p1["triples"]), str(p2["triples"]), p1["triples"] > p2["triples"], p2["triples"] > p1["triples"]),
-                ("🔢 Estadísticas de Volumen", "Jonrones (HR)", str(p1["hr"]), str(p2["hr"]), p1["hr"] > p2["hr"], p2["hr"] > p1["hr"]),
+                ("🔢 Estadísticas de Volumen", "Dobles (2B)", str(d1), str(d2), d1 > d2, d2 > d1),
+                ("🔢 Estadísticas de Volumen", "Triples (3B)", str(t1), str(t2), t1 > t2, t2 > t1),
+                ("🔢 Estadísticas de Volumen", "Jonrones (HR)", str(hr1), str(hr2), hr1 > hr2, hr2 > hr1),
                 ("🔢 Estadísticas de Volumen", "Bases Totales (TB)", str(tb1), str(tb2), tb1 > tb2, tb2 > tb1),
                 ("🔢 Estadísticas de Volumen", "Extrabases (XBH)", str(xbh1), str(xbh2), xbh1 > xbh2, xbh2 > xbh1),
                 ("🔢 Estadísticas de Volumen", "Carreras Impulsadas (RBI)", str(p1["rbi"]), str(p2["rbi"]), p1["rbi"] > p2["rbi"], p2["rbi"] > p1["rbi"]),
