@@ -1,11 +1,11 @@
-﻿version: "3.7"
+version: "3.7"
 
 services:
-  caraquista-reflex:
+  republicaraquistapp-reflex:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: caraquista-reflex
+    container_name: republicaraquistapp-reflex
     restart: always
     environment:
       - SUPABASE_URL=${SUPABASE_URL}
