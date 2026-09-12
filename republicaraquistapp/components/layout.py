@@ -159,7 +159,7 @@ def footer() -> rx.Component:
                         ),
                         rx.hstack(
                             rx.icon("cpu", size=14, color=ACCENT_GOLD),
-                            rx.text("Modelos: Tango RE24, ELO 5k Monte Carlo, BIS Hardness", size="1", color=TEXT_MUTED),
+                            rx.text("Modelos: Tango RE24, Simulación ELO, BIS Hardness", size="1", color=TEXT_MUTED),
                             align="center",
                             spacing="2",
                         ),

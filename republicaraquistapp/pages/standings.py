@@ -3,11 +3,11 @@
 standings.py
 ------------
 Vista completa de Posiciones, Sabermetría Pitagórica, Ratings ELO,
-Simulaciones Monte Carlo (5,000 Iteraciones), Predictor H2H y Semanas ISO (Ruta /standings).
+Simulaciones Monte Carlo, Predictor H2H y Semanas ISO (Ruta /standings).
 Contiene 4 pestañas interactivas:
 1. 📊 Tabla Oficial (Posiciones con selector de fases, KPIs de Leones y glosario).
 2. 🧮 Sabermetría Pitagórica (Bill James / Davenport 1.83, xW, xL, Delta W y diagnóstico).
-3. ⚡ ELO & Monte Carlo (Proyecciones 5k simulaciones, Matriz 1°-8°, Predictor H2H y Power Rankings).
+3. ⚡ ELO & Monte Carlo (Proyecciones estocásticas, Matriz 1°-8°, Predictor H2H y Power Rankings).
 4. 📅 Día/Noche & Semanas ISO (Desglose situacional y récord semana a semana ISO).
 """
 
@@ -448,7 +448,7 @@ def tab_pythagorean_standings() -> rx.Component:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# 3. PESTAÑA 3: SUITE ELO & SIMULACIONES MONTE CARLO (5,000 ITERACIONES)
+# 3. PESTAÑA 3: SUITE ELO & SIMULACIONES MONTE CARLO
 # ═════════════════════════════════════════════════════════════════════════════
 
 def monte_carlo_proj_row(team: dict) -> rx.Component:
@@ -523,7 +523,7 @@ def elo_ranking_row(team: dict) -> rx.Component:
 
 
 def tab_elo_and_monte_carlo() -> rx.Component:
-    """Contenido de la Pestaña 3: ELO, 5k Monte Carlo y Predictor H2H."""
+    """Contenido de la Pestaña 3: ELO, Simulaciones Monte Carlo y Predictor H2H."""
     return rx.vstack(
         # Encabezado ELO & Monte Carlo
         rx.box(
@@ -532,13 +532,13 @@ def tab_elo_and_monte_carlo() -> rx.Component:
                     rx.icon("zap", size=20, color=ACCENT_GOLD),
                     rx.heading("SUITE ELO & SIMULACIONES MONTE CARLO", size="4", color=TEXT_PRIMARY, font_weight="800"),
                     rx.spacer(),
-                    rx.badge("5,000 Iteraciones", style=GOLD_BADGE_STYLE),
+                    rx.badge("Simulación Estocástica", style=GOLD_BADGE_STYLE),
                     align="center",
                     width="100%",
                 ),
                 rx.text(
                     "El motor ELO ajusta la fuerza de cada novena partido a partido con ventaja reglamentaria de localía (+35 pts). "
-                    "Mediante 5,000 iteraciones Monte Carlo simulamos la temporada restante, la Serie del Comodín (5° vs 6°), "
+                    "Mediante simulación estocástica Monte Carlo proyectamos la temporada restante, la Serie del Comodín (5° vs 6°), "
                     "el Round Robin de 5 equipos y la Gran Final a 7 juegos para predecir al Campeón LVBP.",
                     size="2",
                     color=TEXT_MUTED,
@@ -563,7 +563,7 @@ def tab_elo_and_monte_carlo() -> rx.Component:
                     rx.spacer(),
                     rx.button(
                         rx.icon("refresh-cw", size=14),
-                        "Re-ejecutar 5,000 Simulaciones",
+                        "Re-ejecutar Simulación",
                         on_click=StandingsState.recalc_simulations,
                         loading=StandingsState.is_simulating,
                         size="1",
@@ -1227,7 +1227,7 @@ def standings_content() -> rx.Component:
         rx.tabs.list(
             rx.tabs.trigger("📊 Tabla Oficial", value="oficial"),
             rx.tabs.trigger("🧮 Sabermetría Pitagórica", value="pitagorica"),
-            rx.tabs.trigger("⚡ ELO & Monte Carlo 5k", value="elo"),
+            rx.tabs.trigger("⚡ ELO & Monte Carlo", value="elo"),
             rx.tabs.trigger("📅 Día/Noche & Semanas ISO", value="situacional"),
             size="2",
         ),
@@ -1261,6 +1261,6 @@ def standings() -> rx.Component:
     return layout(
         content=standings_content(),
         page_title="Posiciones, Sabermetría & Ratings ELO",
-        page_description="Clasificación oficial, expectativa pitagórica, 5,000 simulaciones Monte Carlo y analítica situacional de la LVBP.",
+        page_description="Clasificación oficial, expectativa pitagórica, simulación Monte Carlo y analítica situacional de la LVBP.",
         current_route="/standings",
     )

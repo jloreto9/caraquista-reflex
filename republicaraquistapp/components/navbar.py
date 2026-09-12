@@ -44,7 +44,7 @@ NAV_ITEMS: List[Dict[str, str]] = [
         "route": "/standings",
         "label": "Posiciones & ELO",
         "icon": "trophy",
-        "desc": "Standings, xW y Simulación 5k",
+        "desc": "Standings, xW y Simulación ELO",
     },
     {
         "route": "/individuales",

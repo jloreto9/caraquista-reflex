@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Tuple, List, Dict, Optional, Any
 from dotenv import load_dotenv
 from core.cache import cache_ttl
+from core.teams import LVBP_TEAMS, LVBP_ABBR, get_team_logo, get_team_name, get_team_abbr
 
 load_dotenv()
 
@@ -509,19 +510,22 @@ def get_recent_games(team_id=695, limit=10, season=None):
 
 @cache_ttl(ttl_seconds=600)
 def get_batting_stats(team_id=695, limit=50, season=None):
-    """Obtiene estadísticas de bateo agregadas por jugador"""
+    """Obtiene estadísticas de bateo agregadas por jugador. Si team_id es None o 'all', obtiene de toda la LVBP."""
     supabase = init_supabase()
 
     if season is None:
         season = get_current_season()
 
     try:
-        # Obtener todos los registros de bateo del equipo para la temporada
-        response = supabase.table('batting_stats') \
+        # Obtener registros de bateo para la temporada
+        query = supabase.table('batting_stats') \
             .select('*, players!inner(full_name), games!inner(season)') \
-            .eq('team_id', team_id) \
-            .eq('games.season', season) \
-            .execute()
+            .eq('games.season', season)
+
+        if team_id is not None and team_id != "all":
+            query = query.eq('team_id', team_id)
+
+        response = query.execute()
 
         if not response.data:
             return pd.DataFrame()
@@ -529,39 +533,43 @@ def get_batting_stats(team_id=695, limit=50, season=None):
         df = pd.DataFrame(response.data)
 
         # Extraer nombre del jugador
-        df['player_name'] = df['players'].apply(
-            lambda x: x.get('full_name', 'N/A') if isinstance(x, dict) else 'N/A'
-        )
+        if 'players' in df.columns:
+            df['player_name'] = df['players'].apply(
+                lambda x: x.get('full_name', 'N/A') if isinstance(x, dict) else 'N/A'
+            )
+        elif 'player_name' not in df.columns:
+            df['player_name'] = 'N/A'
 
-        # Agrupar por jugador y sumar estadísticas (incluir todas las columnas disponibles)
-        agg_dict = {
-            'ab': 'sum',
-            'r': 'sum',
-            'h': 'sum',
-            'doubles': 'sum',
-            'triples': 'sum',
-            'hr': 'sum',
-            'rbi': 'sum',
-            'bb': 'sum',
-            'so': 'sum',
-            'sb': 'sum'
-        }
-
-        # Agregar columnas adicionales si existen
-        if 'cs' in df.columns:
-            agg_dict['cs'] = 'sum'
-        if 'hbp' in df.columns:
-            agg_dict['hbp'] = 'sum'
-        if 'sf' in df.columns:
-            agg_dict['sf'] = 'sum'
-        if 'sh' in df.columns:
-            agg_dict['sh'] = 'sum'
+        # Agrupar por jugador y sumar estadísticas (tolerando columnas ausentes)
+        possible_cols = ['ab', 'r', 'h', 'doubles', 'triples', 'hr', 'rbi', 'bb', 'so', 'sb', 'cs', 'hbp', 'sf', 'sh']
+        agg_dict = {c: 'sum' for c in possible_cols if c in df.columns}
+        if 'team_id' in df.columns:
+            agg_dict['team_id'] = 'last'
 
         grouped = df.groupby(['player_id', 'player_name']).agg(agg_dict).reset_index()
 
+        # Mapear nombres y abreviaturas oficiales de equipo
+        from core.teams import LVBP_TEAMS, LVBP_ABBR
+        if 'team_id' in grouped.columns:
+            grouped['team_name'] = grouped['team_id'].apply(
+                lambda tid: LVBP_TEAMS.get(int(tid) if pd.notna(tid) else 0, "Equipo LVBP")
+            )
+            grouped['team_abbr'] = grouped['team_id'].apply(
+                lambda tid: LVBP_ABBR.get(int(tid) if pd.notna(tid) else 0, "LVBP")
+            )
+        else:
+            grouped['team_id'] = team_id if team_id else 695
+            grouped['team_name'] = LVBP_TEAMS.get(team_id, "Leones del Caracas") if team_id else "Leones del Caracas"
+            grouped['team_abbr'] = LVBP_ABBR.get(team_id, "CAR") if team_id else "CAR"
+
+        # Asegurar presencia de todas las columnas de bateo
+        for col in ['ab', 'r', 'h', 'doubles', 'triples', 'hr', 'rbi', 'bb', 'so', 'sb', 'cs', 'hbp', 'sf', 'sh']:
+            if col not in grouped.columns:
+                grouped[col] = 0
+
         # Calcular estadísticas derivadas con fórmula estándar de OBP
-        hbp_col = grouped['hbp'] if 'hbp' in grouped.columns else 0
-        sf_col = grouped['sf'] if 'sf' in grouped.columns else 0
+        hbp_col = grouped['hbp']
+        sf_col = grouped['sf']
         obp_den = grouped['ab'] + grouped['bb'] + hbp_col + sf_col
 
         grouped['avg'] = np.where(grouped['ab'] > 0, (grouped['h'] / grouped['ab']), 0.0).round(3)
@@ -574,7 +582,10 @@ def get_batting_stats(team_id=695, limit=50, season=None):
             lambda row: {'full_name': row['player_name']}, axis=1
         )
 
-        return grouped.sort_values('ops', ascending=False).head(limit)
+        res = grouped.sort_values('ops', ascending=False)
+        if limit is not None:
+            res = res.head(limit)
+        return res
 
     except Exception as e:
         print(f"Error obteniendo estadísticas de bateo: {str(e)}")
@@ -582,19 +593,22 @@ def get_batting_stats(team_id=695, limit=50, season=None):
 
 @cache_ttl(ttl_seconds=600)
 def get_pitching_stats(team_id=695, limit=50, season=None):
-    """Obtiene estadísticas de pitcheo agregadas por jugador"""
+    """Obtiene estadísticas de pitcheo agregadas por jugador. Si team_id es None o 'all', obtiene de toda la LVBP."""
     supabase = init_supabase()
 
     if season is None:
         season = get_current_season()
 
     try:
-        # Obtener todos los registros de pitcheo del equipo para la temporada
-        response = supabase.table('pitching_stats') \
+        # Obtener registros de pitcheo para la temporada
+        query = supabase.table('pitching_stats') \
             .select('*, players!inner(full_name), games!inner(season)') \
-            .eq('team_id', team_id) \
-            .eq('games.season', season) \
-            .execute()
+            .eq('games.season', season)
+
+        if team_id is not None and team_id != "all":
+            query = query.eq('team_id', team_id)
+
+        response = query.execute()
 
         if not response.data:
             return pd.DataFrame()
@@ -602,34 +616,42 @@ def get_pitching_stats(team_id=695, limit=50, season=None):
         df = pd.DataFrame(response.data)
 
         # Extraer nombre del jugador
-        df['player_name'] = df['players'].apply(
-            lambda x: x.get('full_name', 'N/A') if isinstance(x, dict) else 'N/A'
-        )
+        if 'players' in df.columns:
+            df['player_name'] = df['players'].apply(
+                lambda x: x.get('full_name', 'N/A') if isinstance(x, dict) else 'N/A'
+            )
+        elif 'player_name' not in df.columns:
+            df['player_name'] = 'N/A'
 
         # Contar juegos (apariciones)
         df['g_count'] = 1
 
-        # Agrupar por jugador y sumar estadísticas (incluir todas las columnas disponibles)
-        agg_dict = {
-            'ip_decimal': 'sum',
-            'h': 'sum',
-            'r': 'sum',
-            'er': 'sum',
-            'bb': 'sum',
-            'so': 'sum',
-            'hr': 'sum',
-            'g_count': 'sum'
-        }
-
-        # Agregar columnas adicionales si existen
-        if 'hbp' in df.columns:
-            agg_dict['hbp'] = 'sum'
-        if 'wp' in df.columns:
-            agg_dict['wp'] = 'sum'
-        if 'bk' in df.columns:
-            agg_dict['bk'] = 'sum'
+        # Agrupar por jugador y sumar estadísticas (tolerando columnas ausentes)
+        possible_p_cols = ['ip_decimal', 'h', 'r', 'er', 'bb', 'so', 'hr', 'w', 'l', 'sv', 'g_count', 'gs', 'hbp', 'wp', 'bk']
+        agg_dict = {c: 'sum' for c in possible_p_cols if c in df.columns}
+        if 'team_id' in df.columns:
+            agg_dict['team_id'] = 'last'
 
         grouped = df.groupby(['player_id', 'player_name']).agg(agg_dict).reset_index()
+
+        # Mapear nombres y abreviaturas oficiales de equipo
+        from core.teams import LVBP_TEAMS, LVBP_ABBR
+        if 'team_id' in grouped.columns:
+            grouped['team_name'] = grouped['team_id'].apply(
+                lambda tid: LVBP_TEAMS.get(int(tid) if pd.notna(tid) else 0, "Equipo LVBP")
+            )
+            grouped['team_abbr'] = grouped['team_id'].apply(
+                lambda tid: LVBP_ABBR.get(int(tid) if pd.notna(tid) else 0, "LVBP")
+            )
+        else:
+            grouped['team_id'] = team_id if team_id else 695
+            grouped['team_name'] = LVBP_TEAMS.get(team_id, "Leones del Caracas") if team_id else "Leones del Caracas"
+            grouped['team_abbr'] = LVBP_ABBR.get(team_id, "CAR") if team_id else "CAR"
+
+        # Asegurar presencia de todas las columnas de pitcheo
+        for col in ['ip_decimal', 'h', 'r', 'er', 'bb', 'so', 'hr', 'w', 'l', 'sv', 'g_count', 'gs', 'hbp', 'wp', 'bk']:
+            if col not in grouped.columns:
+                grouped[col] = 0
 
         # Renombrar columnas
         grouped = grouped.rename(columns={
@@ -653,7 +675,10 @@ def get_pitching_stats(team_id=695, limit=50, season=None):
             lambda row: {'full_name': row['player_name']}, axis=1
         )
 
-        return grouped.sort_values('ip', ascending=False).head(limit)
+        res = grouped.sort_values('ip', ascending=False)
+        if limit is not None:
+            res = res.head(limit)
+        return res
 
     except Exception as e:
         print(f"Error obteniendo estadísticas de pitcheo: {str(e)}")
@@ -956,7 +981,8 @@ def get_individual_fielding_stats(season=None, team_id=None, phase='R') -> pd.Da
                 "cs_pct": cs_pct,
                 "passed_balls": pb,
                 "pb": pb,
-                "throwing_errors": te
+                "throwing_errors": te,
+                "team_abbr": LVBP_ABBR.get(int(t_id) if pd.notna(t_id) else 0, "LVBP")
             }
             rows.append(row)
             

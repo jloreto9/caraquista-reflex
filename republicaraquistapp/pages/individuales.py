@@ -58,12 +58,21 @@ def individual_kpi_card(title: str, value: str, subtitle: str, icon_name: str, c
 
 # ── Fila de Bateador ─────────────────────────────────────────────────────────
 def batting_row(p: Dict[str, Any]) -> rx.Component:
-    """Fila de la tabla de bateo con métricas avanzadas."""
+    """Fila de la tabla de bateo con métricas avanzadas y equipo."""
     return rx.table.row(
         rx.table.cell(
             rx.hstack(
                 rx.image(src=p["headshot"], width="28px", height="28px", border_radius="50%", fallback="/logo.png"),
-                rx.text(p["player_name"], size="2", font_weight="700", color=TEXT_PRIMARY),
+                rx.vstack(
+                    rx.hstack(
+                        rx.text(p["player_name"], size="2", font_weight="700", color=TEXT_PRIMARY),
+                        rx.badge(p["team_abbr"], color_scheme="amber", variant="soft", size="1"),
+                        spacing="1",
+                        align="center",
+                    ),
+                    spacing="0",
+                    align="start",
+                ),
                 align="center",
                 spacing="2",
             )
@@ -100,13 +109,18 @@ def batting_row(p: Dict[str, Any]) -> rx.Component:
 
 # ── Fila de Lanzador ─────────────────────────────────────────────────────────
 def pitching_row(p: Dict[str, Any]) -> rx.Component:
-    """Fila de la tabla de pitcheo con métricas avanzadas."""
+    """Fila de la tabla de pitcheo con métricas avanzadas y equipo."""
     return rx.table.row(
         rx.table.cell(
             rx.hstack(
                 rx.image(src=p["headshot"], width="28px", height="28px", border_radius="50%", fallback="/logo.png"),
                 rx.vstack(
-                    rx.text(p["player_name"], size="2", font_weight="700", color=TEXT_PRIMARY),
+                    rx.hstack(
+                        rx.text(p["player_name"], size="2", font_weight="700", color=TEXT_PRIMARY),
+                        rx.badge(p["team_abbr"], color_scheme="amber", variant="soft", size="1"),
+                        spacing="1",
+                        align="center",
+                    ),
                     rx.badge(p["role"], color_scheme=p["role_color"], variant="soft", size="1"),
                     spacing="0",
                     align="start",
@@ -138,12 +152,21 @@ def pitching_row(p: Dict[str, Any]) -> rx.Component:
 
 # ── Fila de Fildeo ───────────────────────────────────────────────────────────
 def fielding_row(p: Dict[str, Any]) -> rx.Component:
-    """Fila de la tabla de fildeo y defensiva."""
+    """Fila de la tabla de fildeo y defensiva con equipo."""
     return rx.table.row(
         rx.table.cell(
             rx.hstack(
                 rx.image(src=p["headshot"], width="28px", height="28px", border_radius="50%", fallback="/logo.png"),
-                rx.text(p["player_name"], size="2", font_weight="700", color=TEXT_PRIMARY),
+                rx.vstack(
+                    rx.hstack(
+                        rx.text(p["player_name"], size="2", font_weight="700", color=TEXT_PRIMARY),
+                        rx.badge(p["team_abbr"], color_scheme="amber", variant="soft", size="1"),
+                        spacing="1",
+                        align="center",
+                    ),
+                    spacing="0",
+                    align="start",
+                ),
                 align="center",
                 spacing="2",
             )
@@ -179,26 +202,40 @@ def fielding_row(p: Dict[str, Any]) -> rx.Component:
 
 # ── Fila de Tabla H2H ────────────────────────────────────────────────────────
 def h2h_comparison_row(item: Dict[str, Any]) -> rx.Component:
-    """Fila de la tabla comparativa Head-to-Head."""
-    return rx.table.row(
-        rx.table.cell(rx.text(item["metric"], size="2", font_weight="700", color=TEXT_PRIMARY)),
-        rx.table.cell(rx.text(item["val_1"], size="2", font_weight="600", color="#FDB827", text_align="center")),
-        rx.table.cell(rx.text(item["val_2"], size="2", font_weight="600", color="#38BDF8", text_align="center")),
-        rx.table.cell(
-            rx.badge(
-                item["winner"],
-                color_scheme=item["winner_scheme"],
-                variant="soft",
-                size="1",
-            )
+    """Fila de la tabla comparativa Head-to-Head con soporte de encabezados de categoría."""
+    return rx.cond(
+        item["is_header"],
+        rx.table.row(
+            rx.table.cell(
+                rx.hstack(
+                    rx.text(item["metric"], size="2", font_weight="800", color=ACCENT_GOLD),
+                    align="center",
+                ),
+                col_span=4,
+                background="rgba(253, 184, 39, 0.08)",
+                padding_y="0.4rem",
+            ),
         ),
-        _hover={"background": "rgba(255, 255, 255, 0.03)"},
+        rx.table.row(
+            rx.table.cell(rx.text(item["metric"], size="2", font_weight="700", color=TEXT_PRIMARY)),
+            rx.table.cell(rx.text(item["val_1"], size="2", font_weight="600", color="#FDB827", text_align="center")),
+            rx.table.cell(rx.text(item["val_2"], size="2", font_weight="600", color="#38BDF8", text_align="center")),
+            rx.table.cell(
+                rx.badge(
+                    item["winner"],
+                    color_scheme=item["winner_scheme"],
+                    variant="soft",
+                    size="1",
+                )
+            ),
+            _hover={"background": "rgba(255, 255, 255, 0.03)"},
+        ),
     )
 
 
 # ── Tarjeta de Perfil H2H ───────────────────────────────────────────────────
 def player_profile_card(card: Dict[str, Any], border_color: str, tag_color: str) -> rx.Component:
-    """Tarjeta visual de jugador en el comparador H2H."""
+    """Tarjeta visual de jugador en el comparador H2H con logo de equipo y métricas."""
     return rx.box(
         rx.hstack(
             rx.image(
@@ -216,7 +253,16 @@ def player_profile_card(card: Dict[str, Any], border_color: str, tag_color: str)
                     align="center",
                     spacing="2",
                 ),
-                rx.text(f"{card['pos']} • {card['team']}", size="1", color=TEXT_MUTED),
+                rx.hstack(
+                    rx.cond(
+                        card["team_logo"] != "",
+                        rx.image(src=card["team_logo"], width="18px", height="18px", fallback="/logo.png"),
+                        rx.fragment(),
+                    ),
+                    rx.text(f"{card['pos']} • {card['team']}", size="1", color=TEXT_MUTED),
+                    align="center",
+                    spacing="1",
+                ),
                 rx.hstack(
                     rx.badge(card["kpi_1"], color_scheme="amber", variant="soft", size="1"),
                     rx.badge(card["kpi_2"], color_scheme="blue", variant="soft", size="1"),
@@ -263,6 +309,19 @@ def batting_tab_view() -> rx.Component:
                         on_change=IndividualesState.set_search_batting,
                         size="2",
                         variant="surface",
+                    ),
+                    align="center",
+                    spacing="2",
+                ),
+                rx.hstack(
+                    rx.text("Equipo:", size="2", font_weight="600", color=TEXT_MUTED),
+                    rx.select(
+                        IndividualesState.team_options,
+                        value=IndividualesState.selected_batting_team,
+                        on_change=IndividualesState.set_selected_batting_team,
+                        size="2",
+                        variant="soft",
+                        color_scheme="amber",
                     ),
                     align="center",
                     spacing="2",
@@ -401,6 +460,19 @@ def pitching_tab_view() -> rx.Component:
                         on_change=IndividualesState.set_search_pitching,
                         size="2",
                         variant="surface",
+                    ),
+                    align="center",
+                    spacing="2",
+                ),
+                rx.hstack(
+                    rx.text("Equipo:", size="2", font_weight="600", color=TEXT_MUTED),
+                    rx.select(
+                        IndividualesState.team_options,
+                        value=IndividualesState.selected_pitching_team,
+                        on_change=IndividualesState.set_selected_pitching_team,
+                        size="2",
+                        variant="soft",
+                        color_scheme="amber",
                     ),
                     align="center",
                     spacing="2",
@@ -554,6 +626,19 @@ def fielding_tab_view() -> rx.Component:
                     spacing="2",
                 ),
                 rx.hstack(
+                    rx.text("Equipo:", size="2", font_weight="600", color=TEXT_MUTED),
+                    rx.select(
+                        IndividualesState.team_options,
+                        value=IndividualesState.selected_fielding_team,
+                        on_change=IndividualesState.set_selected_fielding_team,
+                        size="2",
+                        variant="soft",
+                        color_scheme="amber",
+                    ),
+                    align="center",
+                    spacing="2",
+                ),
+                rx.hstack(
                     rx.text("Posición:", size="2", font_weight="600", color=TEXT_MUTED),
                     rx.select(
                         ["Todas", "C", "1B", "2B", "3B", "SS", "OF", "LF", "CF", "RF", "P"],
@@ -642,57 +727,86 @@ def comparator_tab_view() -> rx.Component:
     return rx.vstack(
         # Barra de Selección de Jugadores
         rx.box(
-            rx.hstack(
+            rx.vstack(
                 rx.hstack(
-                    rx.text("Tipo:", size="2", font_weight="700", color=ACCENT_GOLD),
-                    rx.select(
-                        ["Bateadores", "Lanzadores"],
-                        value=IndividualesState.compare_type,
-                        on_change=IndividualesState.set_compare_type,
-                        size="2",
-                        variant="soft",
-                        color_scheme="amber",
-                    ),
-                    align="center",
-                    spacing="2",
-                ),
-                rx.hstack(
-                    rx.text("Jugador 1:", size="2", font_weight="700", color="#FDB827"),
-                    rx.select(
-                        rx.cond(
-                            IndividualesState.compare_type == "Bateadores",
-                            IndividualesState.available_batters,
-                            IndividualesState.available_pitchers,
+                    rx.hstack(
+                        rx.icon("sliders-horizontal", size=16, color=ACCENT_GOLD),
+                        rx.text("Modo:", size="2", font_weight="700", color=ACCENT_GOLD),
+                        rx.select(
+                            ["Bateadores", "Lanzadores"],
+                            value=IndividualesState.compare_type,
+                            on_change=IndividualesState.set_compare_type,
+                            size="2",
+                            variant="soft",
+                            color_scheme="amber",
                         ),
-                        value=IndividualesState.selected_player_1,
-                        on_change=IndividualesState.set_selected_player_1,
-                        size="2",
-                        variant="surface",
+                        align="center",
+                        spacing="2",
                     ),
+                    rx.spacer(),
                     align="center",
-                    spacing="2",
+                    width="100%",
                 ),
-                rx.text("VS", size="3", font_weight="900", color=TEXT_MUTED),
                 rx.hstack(
-                    rx.text("Jugador 2:", size="2", font_weight="700", color="#38BDF8"),
-                    rx.select(
-                        rx.cond(
-                            IndividualesState.compare_type == "Bateadores",
-                            IndividualesState.available_batters,
-                            IndividualesState.available_pitchers,
+                    # Jugador 1
+                    rx.hstack(
+                        rx.badge("1", color_scheme="amber", variant="solid", radius="full"),
+                        rx.text("Equipo 1:", size="2", font_weight="700", color="#FDB827"),
+                        rx.select(
+                            IndividualesState.team_options,
+                            value=IndividualesState.comparator_team_1,
+                            on_change=IndividualesState.set_comparator_team_1,
+                            size="2",
+                            variant="soft",
+                            color_scheme="amber",
                         ),
-                        value=IndividualesState.selected_player_2,
-                        on_change=IndividualesState.set_selected_player_2,
-                        size="2",
-                        variant="surface",
+                        rx.select(
+                            rx.cond(
+                                IndividualesState.compare_type == "Bateadores",
+                                IndividualesState.available_batters_p1,
+                                IndividualesState.available_pitchers_p1,
+                            ),
+                            value=IndividualesState.selected_player_1,
+                            on_change=IndividualesState.set_selected_player_1,
+                            size="2",
+                            variant="surface",
+                        ),
+                        align="center",
+                        spacing="2",
+                    ),
+                    rx.text("VS", size="3", font_weight="900", color=TEXT_MUTED, padding_x="0.5rem"),
+                    # Jugador 2
+                    rx.hstack(
+                        rx.badge("2", color_scheme="blue", variant="solid", radius="full"),
+                        rx.text("Equipo 2:", size="2", font_weight="700", color="#38BDF8"),
+                        rx.select(
+                            IndividualesState.team_options,
+                            value=IndividualesState.comparator_team_2,
+                            on_change=IndividualesState.set_comparator_team_2,
+                            size="2",
+                            variant="soft",
+                            color_scheme="blue",
+                        ),
+                        rx.select(
+                            rx.cond(
+                                IndividualesState.compare_type == "Bateadores",
+                                IndividualesState.available_batters_p2,
+                                IndividualesState.available_pitchers_p2,
+                            ),
+                            value=IndividualesState.selected_player_2,
+                            on_change=IndividualesState.set_selected_player_2,
+                            size="2",
+                            variant="surface",
+                        ),
+                        align="center",
+                        spacing="2",
                     ),
                     align="center",
-                    spacing="2",
+                    spacing="3",
+                    wrap="wrap",
+                    width="100%",
                 ),
-                rx.spacer(),
-                align="center",
-                spacing="4",
-                wrap="wrap",
+                spacing="3",
                 width="100%",
             ),
             style=CARD_STYLE,
@@ -737,10 +851,10 @@ def comparator_tab_view() -> rx.Component:
                         rx.table.root(
                             rx.table.header(
                                 rx.table.row(
-                                    rx.table.column_header_cell("Categoría"),
+                                    rx.table.column_header_cell("Métrica / Categoría"),
                                     rx.table.column_header_cell("Jugador 1"),
                                     rx.table.column_header_cell("Jugador 2"),
-                                    rx.table.column_header_cell("Líder"),
+                                    rx.table.column_header_cell("Ventaja"),
                                 ),
                             ),
                             rx.table.body(
