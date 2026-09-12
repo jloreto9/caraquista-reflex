@@ -70,6 +70,14 @@ def _find_player(data: List[Dict[str, Any]], query: str) -> Optional[Dict[str, A
     return None
 
 
+def _shorten_name(name: str) -> str:
+    """Abrevia nombres largos a formato 'H. Castro' para badges y celdas compactas."""
+    parts = name.strip().split()
+    if len(parts) >= 2:
+        return f"{parts[0][0]}. {parts[-1]}"
+    return name
+
+
 class IndividualesState(AppState):
     """Estado reactivo para estadísticas individuales y comparador sabermétrico."""
 
@@ -858,7 +866,7 @@ class IndividualesState(AppState):
                 "pos": "Bateador",
                 "team": f"{p1.get('team_name', 'Leones del Caracas')} ({p1.get('team_abbr', 'CAR')})",
                 "team_logo": p1.get("team_logo") or get_team_logo(t1_id, size=72),
-                "headshot": p1["headshot"],
+                "headshot": p1.get("headshot", ""),
                 "badge": p1.get("team_abbr", "CAR"),
                 "kpi_1": f"AVG {p1['avg_str']}",
                 "kpi_2": f"OPS {p1['ops_str']}",
@@ -869,7 +877,7 @@ class IndividualesState(AppState):
                 "pos": "Bateador",
                 "team": f"{p2.get('team_name', 'Equipo Rival')} ({p2.get('team_abbr', 'LVBP')})",
                 "team_logo": p2.get("team_logo") or get_team_logo(t2_id, size=72),
-                "headshot": p2["headshot"],
+                "headshot": p2.get("headshot", ""),
                 "badge": p2.get("team_abbr", "LVBP"),
                 "kpi_1": f"AVG {p2['avg_str']}",
                 "kpi_2": f"OPS {p2['ops_str']}",
@@ -909,21 +917,21 @@ class IndividualesState(AppState):
 
             cats = [
                 # ⚡ Ofensiva & Sabermetría
-                ("⚡ Ofensiva & Sabermetría", "wOBA", p1["woba_str"], p2["woba_str"], p1["woba"] > p2["woba"], p2["woba"] > p1["woba"]),
-                ("⚡ Ofensiva & Sabermetría", "wRC+", f"{p1['wrc_plus']}", f"{p2['wrc_plus']}", p1["wrc_plus"] > p2["wrc_plus"], p2["wrc_plus"] > p1["wrc_plus"]),
-                ("⚡ Ofensiva & Sabermetría", "ISO", p1["iso_str"], p2["iso_str"], p1["iso"] > p2["iso"], p2["iso"] > p1["iso"]),
-                ("⚡ Ofensiva & Sabermetría", "OPS", p1["ops_str"], p2["ops_str"], p1["ops"] > p2["ops"], p2["ops"] > p1["ops"]),
-                ("⚡ Ofensiva & Sabermetría", "OBP", p1["obp_str"], p2["obp_str"], p1["obp"] > p2["obp"], p2["obp"] > p1["obp"]),
-                ("⚡ Ofensiva & Sabermetría", "SLG", p1["slg_str"], p2["slg_str"], p1["slg"] > p2["slg"], p2["slg"] > p1["slg"]),
-                ("⚡ Ofensiva & Sabermetría", "AVG", p1["avg_str"], p2["avg_str"], p1["avg"] > p2["avg"], p2["avg"] > p1["avg"]),
+                ("⚡ Ofensiva & Sabermetría", "wOBA", p1.get("woba_str", ".000"), p2.get("woba_str", ".000"), p1.get("woba", 0.0) > p2.get("woba", 0.0), p2.get("woba", 0.0) > p1.get("woba", 0.0)),
+                ("⚡ Ofensiva & Sabermetría", "wRC+", f"{p1.get('wrc_plus', 100)}", f"{p2.get('wrc_plus', 100)}", p1.get("wrc_plus", 100) > p2.get("wrc_plus", 100), p2.get("wrc_plus", 100) > p1.get("wrc_plus", 100)),
+                ("⚡ Ofensiva & Sabermetría", "ISO", p1.get("iso_str", ".000"), p2.get("iso_str", ".000"), p1.get("iso", 0.0) > p2.get("iso", 0.0), p2.get("iso", 0.0) > p1.get("iso", 0.0)),
+                ("⚡ Ofensiva & Sabermetría", "OPS", p1.get("ops_str", ".000"), p2.get("ops_str", ".000"), p1.get("ops", 0.0) > p2.get("ops", 0.0), p2.get("ops", 0.0) > p1.get("ops", 0.0)),
+                ("⚡ Ofensiva & Sabermetría", "OBP", p1.get("obp_str", ".000"), p2.get("obp_str", ".000"), p1.get("obp", 0.0) > p2.get("obp", 0.0), p2.get("obp", 0.0) > p1.get("obp", 0.0)),
+                ("⚡ Ofensiva & Sabermetría", "SLG", p1.get("slg_str", ".000"), p2.get("slg_str", ".000"), p1.get("slg", 0.0) > p2.get("slg", 0.0), p2.get("slg", 0.0) > p1.get("slg", 0.0)),
+                ("⚡ Ofensiva & Sabermetría", "AVG", p1.get("avg_str", ".000"), p2.get("avg_str", ".000"), p1.get("avg", 0.0) > p2.get("avg", 0.0), p2.get("avg", 0.0) > p1.get("avg", 0.0)),
                 ("⚡ Ofensiva & Sabermetría", "BB%", p1.get("bb_pct_str", "0.0%"), p2.get("bb_pct_str", "0.0%"), p1.get("bb_pct", 0) > p2.get("bb_pct", 0), p2.get("bb_pct", 0) > p1.get("bb_pct", 0)),
                 ("⚡ Ofensiva & Sabermetría", "K%", p1.get("k_pct_str", "0.0%"), p2.get("k_pct_str", "0.0%"), p1.get("k_pct", 0) < p2.get("k_pct", 0), p2.get("k_pct", 0) < p1.get("k_pct", 0)),
-                ("⚡ Ofensiva & Sabermetría", "BABIP", p1["babip_str"], p2["babip_str"], p1["babip"] > p2["babip"], p2["babip"] > p1["babip"]),
+                ("⚡ Ofensiva & Sabermetría", "BABIP", p1.get("babip_str", ".000"), p2.get("babip_str", ".000"), p1.get("babip", 0.0) > p2.get("babip", 0.0), p2.get("babip", 0.0) > p1.get("babip", 0.0)),
 
                 # 🔢 Estadísticas de Volumen
-                ("🔢 Estadísticas de Volumen", "Apariciones al Plato (PA)", str(p1["pa"]), str(p2["pa"]), p1["pa"] > p2["pa"], p2["pa"] > p1["pa"]),
-                ("🔢 Estadísticas de Volumen", "Turnos al Bate (AB)", str(p1["ab"]), str(p2["ab"]), p1["ab"] > p2["ab"], p2["ab"] > p1["ab"]),
-                ("🔢 Estadísticas de Volumen", "Hits (H)", str(p1["h"]), str(p2["h"]), p1["h"] > p2["h"], p2["h"] > p1["h"]),
+                ("🔢 Estadísticas de Volumen", "Apariciones al Plato (PA)", str(p1.get("pa", 0)), str(p2.get("pa", 0)), p1.get("pa", 0) > p2.get("pa", 0), p2.get("pa", 0) > p1.get("pa", 0)),
+                ("🔢 Estadísticas de Volumen", "Turnos al Bate (AB)", str(p1.get("ab", 0)), str(p2.get("ab", 0)), p1.get("ab", 0) > p2.get("ab", 0), p2.get("ab", 0) > p1.get("ab", 0)),
+                ("🔢 Estadísticas de Volumen", "Hits (H)", str(p1.get("h", 0)), str(p2.get("h", 0)), p1.get("h", 0) > p2.get("h", 0), p2.get("h", 0) > p1.get("h", 0)),
                 ("🔢 Estadísticas de Volumen", "Sencillos (1B)", str(d1_1), str(d1_2), d1_1 > d1_2, d1_2 > d1_1),
                 ("🔢 Estadísticas de Volumen", "Dobles (2B)", str(d1), str(d2), d1 > d2, d2 > d1),
                 ("🔢 Estadísticas de Volumen", "Triples (3B)", str(t1), str(t2), t1 > t2, t2 > t1),
@@ -981,12 +989,12 @@ class IndividualesState(AppState):
                     })
                 if is_p1_win:
                     p1_wins += 1
-                    winner = f"{p1['player_name']} ({p1.get('team_abbr', 'CAR')})"
+                    winner = f"{_shorten_name(p1['player_name'])} ({p1.get('team_abbr', 'CAR')})"
                     w_color = "#FDB827"
                     w_scheme = "amber"
                 elif is_p2_win:
                     p2_wins += 1
-                    winner = f"{p2['player_name']} ({p2.get('team_abbr', 'LVBP')})"
+                    winner = f"{_shorten_name(p2['player_name'])} ({p2.get('team_abbr', 'LVBP')})"
                     w_color = "#38BDF8"
                     w_scheme = "blue"
                 else:
@@ -1040,7 +1048,7 @@ class IndividualesState(AppState):
                 "pos": p1.get("role", "Lanzador"),
                 "team": f"{p1.get('team_name', 'Leones del Caracas')} ({p1.get('team_abbr', 'CAR')})",
                 "team_logo": p1.get("team_logo") or get_team_logo(t1_id, size=72),
-                "headshot": p1["headshot"],
+                "headshot": p1.get("headshot", ""),
                 "badge": p1.get("team_abbr", "CAR"),
                 "kpi_1": f"ERA {p1['era_str']}",
                 "kpi_2": f"WHIP {p1['whip_str']}",
@@ -1051,7 +1059,7 @@ class IndividualesState(AppState):
                 "pos": p2.get("role", "Lanzador"),
                 "team": f"{p2.get('team_name', 'Equipo Rival')} ({p2.get('team_abbr', 'LVBP')})",
                 "team_logo": p2.get("team_logo") or get_team_logo(t2_id, size=72),
-                "headshot": p2["headshot"],
+                "headshot": p2.get("headshot", ""),
                 "badge": p2.get("team_abbr", "LVBP"),
                 "kpi_1": f"ERA {p2['era_str']}",
                 "kpi_2": f"WHIP {p2['whip_str']}",
@@ -1119,12 +1127,12 @@ class IndividualesState(AppState):
                     })
                 if is_p1_win:
                     p1_wins += 1
-                    winner = f"{p1['player_name']} ({p1.get('team_abbr', 'CAR')})"
+                    winner = f"{_shorten_name(p1['player_name'])} ({p1.get('team_abbr', 'CAR')})"
                     w_color = "#FDB827"
                     w_scheme = "amber"
                 elif is_p2_win:
                     p2_wins += 1
-                    winner = f"{p2['player_name']} ({p2.get('team_abbr', 'LVBP')})"
+                    winner = f"{_shorten_name(p2['player_name'])} ({p2.get('team_abbr', 'LVBP')})"
                     w_color = "#38BDF8"
                     w_scheme = "blue"
                 else:
@@ -1162,7 +1170,134 @@ class IndividualesState(AppState):
                     f"Ambos lanzadores exhiben solidez similar en su staff monticular."
                 )
 
-    # ── Gráficos Reactivos (@rx.var) ───────────────────────────────────────────
+    # ── Percentiles y Gráficos Reactivos (@rx.var) ───────────────────────────
+    @rx.var
+    def percentile_table_rows(self) -> List[Dict[str, Any]]:
+        """Tabla estructurada de percentiles 0-100 para ambos jugadores con valores y ventajas."""
+        if not self.selected_player_1 or not self.selected_player_2:
+            return []
+
+        if self.compare_type == "Bateadores":
+            p1 = _find_player(self.batting_data_raw, self.selected_player_1)
+            p2 = _find_player(self.batting_data_raw, self.selected_player_2)
+            pool = [p for p in self.batting_data_raw if p["ab"] >= 5] or self.batting_data_raw
+
+            if not p1 or not p2 or not pool:
+                return []
+
+            axes = [
+                ("Contacto (AVG)", "avg", "avg_str", True),
+                ("Embasado (OBP)", "obp", "obp_str", True),
+                ("Poder (SLG)", "slg", "slg_str", True),
+                ("Producción (OPS)", "ops", "ops_str", True),
+                ("wOBA", "woba", "woba_str", True),
+                ("wRC+", "wrc_plus", "wrc_plus", True),
+                ("Extrabases (ISO)", "iso", "iso_str", True),
+                ("Paciencia (BB%)", "bb_pct", "bb_pct_str", True),
+            ]
+
+            def get_pct(val, key, higher_better):
+                vals = [x.get(key, 0) for x in pool]
+                if not vals:
+                    return 50
+                if higher_better:
+                    return min(100, max(5, int((sum(1 for v in vals if v <= val) / len(vals)) * 100)))
+                else:
+                    return min(100, max(5, int((sum(1 for v in vals if v >= val) / len(vals)) * 100)))
+
+            rows = []
+            for name, key, str_key, higher_better in axes:
+                v1_raw = p1.get(key, 0)
+                v2_raw = p2.get(key, 0)
+                v1_str = str(p1.get(str_key, v1_raw))
+                v2_str = str(p2.get(str_key, v2_raw))
+                pct1 = get_pct(v1_raw, key, higher_better)
+                pct2 = get_pct(v2_raw, key, higher_better)
+
+                if pct1 > pct2:
+                    leader = f"{_shorten_name(p1['player_name'])} ({p1.get('team_abbr', 'CAR')})"
+                    leader_scheme = "amber"
+                elif pct2 > pct1:
+                    leader = f"{_shorten_name(p2['player_name'])} ({p2.get('team_abbr', 'LVBP')})"
+                    leader_scheme = "blue"
+                else:
+                    leader = "Empate"
+                    leader_scheme = "gray"
+
+                rows.append({
+                    "metric": name,
+                    "val_1": v1_str,
+                    "pct_1": pct1,
+                    "pct_1_str": f"P{pct1}",
+                    "val_2": v2_str,
+                    "pct_2": pct2,
+                    "pct_2_str": f"P{pct2}",
+                    "leader": leader,
+                    "leader_scheme": leader_scheme,
+                })
+            return rows
+
+        else:
+            # Lanzadores
+            p1 = _find_player(self.pitching_data_raw, self.selected_player_1)
+            p2 = _find_player(self.pitching_data_raw, self.selected_player_2)
+            pool = [p for p in self.pitching_data_raw if p["ip"] >= 2.0] or self.pitching_data_raw
+
+            if not p1 or not p2 or not pool:
+                return []
+
+            axes_p = [
+                ("Efectividad (ERA)", "era", "era_str", False),
+                ("Control (WHIP)", "whip", "whip_str", False),
+                ("FIP Independiente", "fip", "fip_str", False),
+                ("Dominio (K/9)", "k9", "k9_str", True),
+                ("Comando (BB/9)", "bb9", "bb9_str", False),
+                ("Relación K/BB", "k_bb", "k_bb_str", True),
+                ("Innings (IP)", "ip", "ip_str", True),
+                ("Ponches (SO)", "so", "so", True),
+            ]
+
+            def get_pct_p(val, key, higher_better):
+                vals = [x.get(key, 0) for x in pool]
+                if not vals:
+                    return 50
+                if higher_better:
+                    return min(100, max(5, int((sum(1 for v in vals if v <= val) / len(vals)) * 100)))
+                else:
+                    return min(100, max(5, int((sum(1 for v in vals if v >= val) / len(vals)) * 100)))
+
+            rows = []
+            for name, key, str_key, higher_better in axes_p:
+                v1_raw = p1.get(key, 0)
+                v2_raw = p2.get(key, 0)
+                v1_str = str(p1.get(str_key, v1_raw))
+                v2_str = str(p2.get(str_key, v2_raw))
+                pct1 = get_pct_p(v1_raw, key, higher_better)
+                pct2 = get_pct_p(v2_raw, key, higher_better)
+
+                if pct1 > pct2:
+                    leader = f"{_shorten_name(p1['player_name'])} ({p1.get('team_abbr', 'CAR')})"
+                    leader_scheme = "amber"
+                elif pct2 > pct1:
+                    leader = f"{_shorten_name(p2['player_name'])} ({p2.get('team_abbr', 'LVBP')})"
+                    leader_scheme = "blue"
+                else:
+                    leader = "Empate"
+                    leader_scheme = "gray"
+
+                rows.append({
+                    "metric": name,
+                    "val_1": v1_str,
+                    "pct_1": pct1,
+                    "pct_1_str": f"P{pct1}",
+                    "val_2": v2_str,
+                    "pct_2": pct2,
+                    "pct_2_str": f"P{pct2}",
+                    "leader": leader,
+                    "leader_scheme": leader_scheme,
+                })
+            return rows
+
     @rx.var
     def radar_chart_figure(self) -> go.Figure:
         """Genera el Radar Polar sabermétrico multidimensional de 8 ejes (Percentiles 0-100 relativos a toda la LVBP)."""

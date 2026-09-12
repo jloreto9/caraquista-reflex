@@ -604,6 +604,73 @@ class TestMatchup360CardImageExport(unittest.TestCase):
         self.assertIsNotNone(event)
         self.assertIn("EventSpec", type(event).__name__)
 
+    def test_percentile_table_rows_batters(self):
+        """Verifica que percentile_table_rows retorne 8 dimensiones sabermétricas con percentiles 0-100."""
+        state = IndividualesState()
+        state.batting_data_raw = [
+            {
+                "player_id": 1, "player_name": "Harold Castro", "team_id": 695, "team_abbr": "CAR",
+                "ab": 100, "pa": 120, "avg": 0.352, "avg_str": ".352", "obp": 0.387, "obp_str": ".387",
+                "slg": 0.471, "slg_str": ".471", "ops": 0.938, "ops_str": "0.938", "woba": 0.384, "woba_str": ".384",
+                "wrc_plus": 114, "iso": 0.183, "iso_str": ".183", "bb_pct": 4.6, "bb_pct_str": "4.6%",
+            },
+            {
+                "player_id": 2, "player_name": "Hernán Pérez", "team_id": 696, "team_abbr": "ARA",
+                "ab": 120, "pa": 140, "avg": 0.314, "avg_str": ".314", "obp": 0.384, "obp_str": ".384",
+                "slg": 0.522, "slg_str": ".522", "ops": 0.967, "ops_str": "0.967", "woba": 0.393, "woba_str": ".393",
+                "wrc_plus": 125, "iso": 0.204, "iso_str": ".204", "bb_pct": 6.9, "bb_pct_str": "6.9%",
+            },
+        ]
+        state.compare_type = "Bateadores"
+        state.selected_player_1 = "Harold Castro (CAR)"
+        state.selected_player_2 = "Hernán Pérez (ARA)"
+
+        rows = state.percentile_table_rows
+        self.assertEqual(len(rows), 8)
+        metrics = [r["metric"] for r in rows]
+        self.assertIn("Contacto (AVG)", metrics)
+        self.assertIn("Producción (OPS)", metrics)
+        self.assertIn("wOBA", metrics)
+        self.assertIn("wRC+", metrics)
+        for r in rows:
+            self.assertIn("pct_1", r)
+            self.assertIn("pct_2", r)
+            self.assertIn("leader", r)
+            self.assertIn(r["leader_scheme"], ["amber", "blue", "gray"])
+            self.assertTrue(0 <= r["pct_1"] <= 100)
+            self.assertTrue(0 <= r["pct_2"] <= 100)
+
+    def test_winner_shortened_names_format(self):
+        """Verifica que los ganadores en h2h_rows usen el formato abreviado compacto ('H. Castro (CAR)')."""
+        state = IndividualesState()
+        state.batting_data_raw = [
+            {
+                "player_id": 1, "player_name": "Harold Castro", "team_id": 695, "team_abbr": "CAR", "headshot": "",
+                "ab": 100, "pa": 120, "h": 35, "hr": 6, "rbi": 25, "r": 20, "bb": 8, "so": 15,
+                "avg": 0.350, "avg_str": ".350", "obp": 0.400, "obp_str": ".400",
+                "slg": 0.550, "slg_str": ".550", "ops": 0.950, "ops_str": "0.950",
+                "woba": 0.400, "woba_str": ".400", "wrc_plus": 140, "iso": 0.200, "iso_str": ".200",
+                "babip": 0.350, "babip_str": ".350",
+            },
+            {
+                "player_id": 2, "player_name": "Hernán Pérez", "team_id": 696, "team_abbr": "ARA", "headshot": "",
+                "ab": 100, "pa": 120, "h": 25, "hr": 4, "rbi": 15, "r": 12, "bb": 6, "so": 20,
+                "avg": 0.250, "avg_str": ".250", "obp": 0.310, "obp_str": ".310",
+                "slg": 0.420, "slg_str": ".420", "ops": 0.730, "ops_str": "0.730",
+                "woba": 0.320, "woba_str": ".320", "wrc_plus": 95, "iso": 0.170, "iso_str": ".170",
+                "babip": 0.270, "babip_str": ".270",
+            },
+        ]
+        state.compare_type = "Bateadores"
+        state.selected_player_1 = "Harold Castro (CAR)"
+        state.selected_player_2 = "Hernán Pérez (ARA)"
+        state.update_h2h_comparison()
+
+        avg_row = next((r for r in state.h2h_rows if r.get("metric") == "AVG"), None)
+        self.assertIsNotNone(avg_row)
+        self.assertEqual(avg_row["winner"], "H. Castro (CAR)")
+
+
 
 if __name__ == "__main__":
     unittest.main()

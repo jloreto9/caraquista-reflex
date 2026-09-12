@@ -226,10 +226,45 @@ def h2h_comparison_row(item: Dict[str, Any]) -> rx.Component:
                     color_scheme=item["winner_scheme"],
                     variant="soft",
                     size="1",
-                )
+                ),
+                white_space="nowrap",
             ),
             _hover={"background": "rgba(255, 255, 255, 0.03)"},
         ),
+    )
+
+
+# ── Fila de Tabla de Percentiles (0-100) ─────────────────────────────────────
+def percentile_row(item: Dict[str, Any]) -> rx.Component:
+    """Fila de la tabla de percentiles 0-100 para la vista comparativa."""
+    return rx.table.row(
+        rx.table.cell(rx.text(item["metric"], size="2", font_weight="700", color=TEXT_PRIMARY)),
+        rx.table.cell(
+            rx.hstack(
+                rx.text(item["val_1"], size="2", font_weight="600", color="#FDB827"),
+                rx.badge(item["pct_1_str"], color_scheme="amber", variant="solid", size="1"),
+                align="center",
+                spacing="2",
+            )
+        ),
+        rx.table.cell(
+            rx.hstack(
+                rx.text(item["val_2"], size="2", font_weight="600", color="#38BDF8"),
+                rx.badge(item["pct_2_str"], color_scheme="blue", variant="solid", size="1"),
+                align="center",
+                spacing="2",
+            )
+        ),
+        rx.table.cell(
+            rx.badge(
+                item["leader"],
+                color_scheme=item["leader_scheme"],
+                variant="soft",
+                size="1",
+            ),
+            white_space="nowrap",
+        ),
+        _hover={"background": "rgba(255, 255, 255, 0.03)"},
     )
 
 
@@ -822,39 +857,97 @@ def comparator_tab_view() -> rx.Component:
         ),
         # Grilla Central: Radar Polar y Tabla Comparativa
         rx.grid(
-            # Columna Izquierda: Radar Polar de 8 Ejes Sabermétricos
+            # Columna Izquierda: Radar Polar y Tabla de Percentiles
             rx.box(
                 rx.vstack(
-                    rx.hstack(
-                        rx.icon("pie-chart", size=18, color=ACCENT_GOLD),
-                        rx.heading("RADAR POLAR SABERMÉTRICO (PERCENTILES 0-100)", size="3", font_weight="800", color=TEXT_PRIMARY),
-                        align="center",
-                        spacing="2",
+                    rx.tabs.root(
+                        rx.tabs.list(
+                            rx.tabs.trigger(
+                                rx.hstack(
+                                    rx.icon("pie-chart", size=16, color=ACCENT_GOLD),
+                                    rx.text("Radar Polar 360°", size="2", font_weight="700"),
+                                    align="center",
+                                    spacing="1",
+                                ),
+                                value="radar",
+                            ),
+                            rx.tabs.trigger(
+                                rx.hstack(
+                                    rx.icon("table", size=16, color=ACCENT_GOLD),
+                                    rx.text("Tabla de Percentiles (0-100)", size="2", font_weight="700"),
+                                    align="center",
+                                    spacing="1",
+                                ),
+                                value="table",
+                            ),
+                        ),
+                        rx.tabs.content(
+                            rx.plotly(data=IndividualesState.radar_chart_figure, width="100%", height="420px"),
+                            value="radar",
+                            width="100%",
+                        ),
+                        rx.tabs.content(
+                            rx.box(
+                                rx.table.root(
+                                    rx.table.header(
+                                        rx.table.row(
+                                            rx.table.column_header_cell("Dimensión Sabermétrica", background="#0D152B", position="sticky", top=0, z_index=2),
+                                            rx.table.column_header_cell("Jugador 1", background="#0D152B", position="sticky", top=0, z_index=2),
+                                            rx.table.column_header_cell("Jugador 2", background="#0D152B", position="sticky", top=0, z_index=2),
+                                            rx.table.column_header_cell("Líder", background="#0D152B", position="sticky", top=0, z_index=2),
+                                        ),
+                                    ),
+                                    rx.table.body(
+                                        rx.foreach(IndividualesState.percentile_table_rows, percentile_row),
+                                    ),
+                                    variant="surface",
+                                    size="2",
+                                    width="100%",
+                                ),
+                                max_height="420px",
+                                overflow_y="auto",
+                                overflow_x="auto",
+                                width="100%",
+                                style={
+                                    "scrollbarWidth": "thin",
+                                    "scrollbarColor": "#FDB827 rgba(255,255,255,0.05)",
+                                    "&::-webkit-scrollbar": {"width": "6px", "height": "6px"},
+                                    "&::-webkit-scrollbar-thumb": {"backgroundColor": "#FDB827", "borderRadius": "4px"},
+                                    "&::-webkit-scrollbar-track": {"backgroundColor": "rgba(255, 255, 255, 0.05)"},
+                                },
+                            ),
+                            value="table",
+                            width="100%",
+                        ),
+                        default_value="radar",
+                        width="100%",
                     ),
-                    rx.plotly.cartesian(data=IndividualesState.radar_chart_figure),
                     spacing="3",
                     width="100%",
                 ),
                 style=CARD_STYLE,
                 width="100%",
             ),
-            # Columna Derecha: Tabla Cara a Cara
+            # Columna Derecha: Tabla Cara a Cara (Acotada al mismo tamaño con scroll vertical)
             rx.box(
                 rx.vstack(
                     rx.hstack(
                         rx.icon("swords", size=18, color=ACCENT_GOLD),
                         rx.heading("DESGLOSE MÉTRICA POR MÉTRICA", size="3", font_weight="800", color=TEXT_PRIMARY),
+                        rx.spacer(),
+                        rx.badge("Deslizar ↓", color_scheme="amber", variant="outline", size="1"),
                         align="center",
                         spacing="2",
+                        width="100%",
                     ),
                     rx.box(
                         rx.table.root(
                             rx.table.header(
                                 rx.table.row(
-                                    rx.table.column_header_cell("Métrica / Categoría"),
-                                    rx.table.column_header_cell("Jugador 1"),
-                                    rx.table.column_header_cell("Jugador 2"),
-                                    rx.table.column_header_cell("Ventaja"),
+                                    rx.table.column_header_cell("Métrica / Categoría", background="#0D152B", position="sticky", top=0, z_index=2),
+                                    rx.table.column_header_cell("Jugador 1", background="#0D152B", position="sticky", top=0, z_index=2),
+                                    rx.table.column_header_cell("Jugador 2", background="#0D152B", position="sticky", top=0, z_index=2),
+                                    rx.table.column_header_cell("Ventaja", background="#0D152B", position="sticky", top=0, z_index=2),
                                 ),
                             ),
                             rx.table.body(
@@ -864,8 +957,17 @@ def comparator_tab_view() -> rx.Component:
                             size="2",
                             width="100%",
                         ),
+                        max_height="455px",
+                        overflow_y="auto",
                         overflow_x="auto",
                         width="100%",
+                        style={
+                            "scrollbarWidth": "thin",
+                            "scrollbarColor": "#FDB827 rgba(255,255,255,0.05)",
+                            "&::-webkit-scrollbar": {"width": "6px", "height": "6px"},
+                            "&::-webkit-scrollbar-thumb": {"backgroundColor": "#FDB827", "borderRadius": "4px"},
+                            "&::-webkit-scrollbar-track": {"backgroundColor": "rgba(255, 255, 255, 0.05)"},
+                        },
                     ),
                     spacing="3",
                     width="100%",
