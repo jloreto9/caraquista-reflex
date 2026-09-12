@@ -44,7 +44,7 @@ def _load_font(size: int, bold: bool = False) -> ImageFont.ImageFont:
 
 def _fetch_circular_image(
     url: Optional[str],
-    size: Tuple[int, int] = (64, 64),
+    size: Tuple[int, int] = (128, 128),
     border_color: Tuple[int, int, int] = (253, 184, 39),
     initials: str = "LV",
 ) -> Image.Image:
@@ -87,13 +87,14 @@ def _fetch_circular_image(
             fill=border_color,
         )
 
-    # Borde decorativo
+    # Borde decorativo proporcional al tamaño
+    b_width = max(2, int(round(3 * (size[0] / 64.0))))
     border_draw = ImageDraw.Draw(circ)
-    border_draw.ellipse((0, 0, size[0] - 1, size[1] - 1), outline=border_color + (255,), width=3)
+    border_draw.ellipse((0, 0, size[0] - 1, size[1] - 1), outline=border_color + (255,), width=b_width)
     return circ
 
 
-def _fetch_team_logo(url: Optional[str], size: Tuple[int, int] = (26, 26)) -> Optional[Image.Image]:
+def _fetch_team_logo(url: Optional[str], size: Tuple[int, int] = (52, 52)) -> Optional[Image.Image]:
     """Descarga y redimensiona el logo oficial de la franquicia."""
     if not url:
         return None
@@ -117,8 +118,15 @@ def build_matchup_image(
     is_batter: bool = True,
     season: int = 2025,
     phase: str = "Temporada Regular",
+    phase_1: Optional[str] = None,
+    phase_2: Optional[str] = None,
+    scale: float = 2.0,
 ) -> bytes:
-    """Genera una tarjeta PNG descargable de alta definición con diseño Dark Navy Glass y créditos oficiales."""
+    """Genera una tarjeta PNG descargable de alta definición (300 DPI) con diseño Dark Navy Glass y créditos oficiales."""
+    sc = float(scale) if scale > 0 else 2.0
+    p1_phase = phase_1 or player_1.get("phase") or phase
+    p2_phase = phase_2 or player_2.get("phase") or phase
+
     name1 = player_1.get("name", "Jugador 1")
     team1 = player_1.get("badge") or player_1.get("team", "CAR")
     pos1 = player_1.get("pos", "Bateador" if is_batter else "Lanzador")
@@ -131,10 +139,15 @@ def build_matchup_image(
     headshot2 = player_2.get("headshot")
     logo2 = player_2.get("team_logo")
 
-    # Geometría
-    COL1, COL2, COL3 = 240, 200, 240
-    W = COL1 + COL2 + COL3  # 680 px
-    ROW_H, HDR_H, FOOT_H = 28, 105, 82
+    # Geometría escalada a alta definición (300 PPI)
+    COL1 = int(round(240 * sc))
+    COL2 = int(round(200 * sc))
+    COL3 = int(round(240 * sc))
+    W = COL1 + COL2 + COL3
+    ROW_H = int(round(30 * sc))
+    HDR_H = int(round(116 * sc))
+    FOOT_H = int(round(86 * sc))
+    LINE_W = max(1, int(round(1 * sc)))
 
     # Filtrar solo filas de datos (no headers de categoría), max 18 filas
     data_rows = [r for r in h2h_rows if not r.get("is_header", False)]
@@ -155,11 +168,12 @@ def build_matchup_image(
     GRAY_TEXT = (148, 163, 184)
     DIM_TEXT  = (100, 116, 139)
 
-    fb = _load_font(12, bold=True)
-    fn = _load_font(11)
-    fs = _load_font(9)
-    f_large = _load_font(14, bold=True)
-    f_title = _load_font(13, bold=True)
+    fb = _load_font(int(round(12 * sc)), bold=True)
+    fn = _load_font(int(round(11 * sc)))
+    fs = _load_font(int(round(9 * sc)))
+    f_large = _load_font(int(round(14 * sc)), bold=True)
+    f_title = _load_font(int(round(13 * sc)), bold=True)
+    f_badge = _load_font(int(round(8.5 * sc)), bold=True)
 
     img = Image.new("RGBA", (W, H), BG_DARK + (255,))
     draw = ImageDraw.Draw(img)
@@ -171,49 +185,63 @@ def build_matchup_image(
             bb = draw.textbbox((0, 0), s, font=font)
             tw, th = bb[2] - bb[0], bb[3] - bb[1]
         except AttributeError:
-            tw, th = len(s) * 6, 12
+            tw, th = int(len(s) * 6 * sc), int(12 * sc)
         draw.text((cx - tw // 2, cy - th // 2), s, font=font, fill=color)
 
     # ── 1. Header Cards ────────────────────────────────────────────────────────
     # Header Left (Jugador 1)
     draw.rectangle([0, 0, COL1 - 1, HDR_H - 1], fill=(24, 18, 20))
-    draw.rectangle([0, 0, 4, HDR_H - 1], fill=GOLD_CLR)
+    draw.rectangle([0, 0, int(round(5 * sc)), HDR_H - 1], fill=GOLD_CLR)
 
     # Header Center (VS Branding)
     draw.rectangle([COL1, 0, COL1 + COL2 - 1, HDR_H - 1], fill=(13, 21, 43))
 
     # Header Right (Jugador 2)
     draw.rectangle([COL1 + COL2, 0, W - 1, HDR_H - 1], fill=(10, 25, 45))
-    draw.rectangle([W - 5, 0, W - 1, HDR_H - 1], fill=BLUE_CLR)
+    draw.rectangle([W - int(round(5 * sc)), 0, W - 1, HDR_H - 1], fill=BLUE_CLR)
 
-    # Pegar Headshots y Logos
+    avatar_sz = int(round(64 * sc))
+    logo_sz = int(round(26 * sc))
+
+    # Pegar Headshots y Logos - Jugador 1
     init1 = "".join([part[0] for part in name1.split()[:2]]).upper() or "P1"
-    hs1 = _fetch_circular_image(headshot1, size=(64, 64), border_color=GOLD_CLR, initials=init1)
-    img.paste(hs1, (12, (HDR_H - 64) // 2), mask=hs1)
-    _tc(COL1 // 2 + 24, 34, name1, f_title, WHITE)
-    _tc(COL1 // 2 + 24, 56, f"{team1} · {pos1}", fs, GOLD_CLR)
+    hs1 = _fetch_circular_image(headshot1, size=(avatar_sz, avatar_sz), border_color=GOLD_CLR, initials=init1)
+    img.paste(hs1, (int(round(12 * sc)), (HDR_H - avatar_sz) // 2), mask=hs1)
 
-    tlogo1 = _fetch_team_logo(logo1, size=(24, 24))
+    p1_cx = COL1 // 2 + int(round(26 * sc))
+    _tc(p1_cx, int(round(32 * sc)), name1, f_title, WHITE)
+    _tc(p1_cx, int(round(58 * sc)), f"{team1} · {pos1}", fs, GOLD_CLR)
+    _tc(p1_cx, int(round(82 * sc)), f"[{p1_phase}]", f_badge, (240, 200, 120))
+
+    tlogo1 = _fetch_team_logo(logo1, size=(logo_sz, logo_sz))
     if tlogo1:
-        img.paste(tlogo1, (COL1 - 32, 12), mask=tlogo1)
+        img.paste(tlogo1, (COL1 - logo_sz - int(round(10 * sc)), int(round(12 * sc))), mask=tlogo1)
 
     # Center Branding & Temporada
-    _tc(COL1 + COL2 // 2, 28, "REPÚBLICA CARAQUISTA", f_large, GOLD_CLR)
-    _tc(COL1 + COL2 // 2, 50, "MATCHUP 360 · LVBP", fb, WHITE)
-    _tc(COL1 + COL2 // 2, 72, f"{season}-{season+1} · {phase}", fs, GRAY_TEXT)
+    _tc(COL1 + COL2 // 2, int(round(28 * sc)), "REPÚBLICA CARAQUISTA", f_large, GOLD_CLR)
+    _tc(COL1 + COL2 // 2, int(round(52 * sc)), "MATCHUP 360 · LVBP", fb, WHITE)
+    if p1_phase != p2_phase:
+        center_phase_txt = f"{season}-{season+1} · Fases Cruzadas"
+    else:
+        center_phase_txt = f"{season}-{season+1} · {p1_phase}"
+    _tc(COL1 + COL2 // 2, int(round(76 * sc)), center_phase_txt, fs, GRAY_TEXT)
 
+    # Pegar Headshots y Logos - Jugador 2
     init2 = "".join([part[0] for part in name2.split()[:2]]).upper() or "P2"
-    hs2 = _fetch_circular_image(headshot2, size=(64, 64), border_color=BLUE_CLR, initials=init2)
-    img.paste(hs2, (COL1 + COL2 + 12, (HDR_H - 64) // 2), mask=hs2)
-    _tc(COL1 + COL2 + COL3 // 2 + 24, 34, name2, f_title, WHITE)
-    _tc(COL1 + COL2 + COL3 // 2 + 24, 56, f"{team2} · {pos2}", fs, BLUE_CLR)
+    hs2 = _fetch_circular_image(headshot2, size=(avatar_sz, avatar_sz), border_color=BLUE_CLR, initials=init2)
+    img.paste(hs2, (COL1 + COL2 + int(round(12 * sc)), (HDR_H - avatar_sz) // 2), mask=hs2)
 
-    tlogo2 = _fetch_team_logo(logo2, size=(24, 24))
+    p2_cx = COL1 + COL2 + COL3 // 2 + int(round(26 * sc))
+    _tc(p2_cx, int(round(32 * sc)), name2, f_title, WHITE)
+    _tc(p2_cx, int(round(58 * sc)), f"{team2} · {pos2}", fs, BLUE_CLR)
+    _tc(p2_cx, int(round(82 * sc)), f"[{p2_phase}]", f_badge, (160, 210, 255))
+
+    tlogo2 = _fetch_team_logo(logo2, size=(logo_sz, logo_sz))
     if tlogo2:
-        img.paste(tlogo2, (W - 32, 12), mask=tlogo2)
+        img.paste(tlogo2, (W - logo_sz - int(round(10 * sc)), int(round(12 * sc))), mask=tlogo2)
 
     # Línea Divisoria Header
-    draw.line([(0, HDR_H), (W, HDR_H)], fill=BORDER_C, width=1)
+    draw.line([(0, HDR_H), (W, HDR_H)], fill=BORDER_C, width=LINE_W)
 
     # ── 2. Filas de Comparación ────────────────────────────────────────────────
     y = HDR_H
@@ -238,16 +266,16 @@ def build_matchup_image(
         _tc(COL1 + COL2 // 2, y + ROW_H // 2, metric_label, fb, (220, 225, 235))
         _tc(COL1 + COL2 + COL3 // 2, y + ROW_H // 2, v2_str, f2, c2)
 
-        draw.line([(0, y + ROW_H), (W, y + ROW_H)], fill=BORDER_C, width=1)
+        draw.line([(0, y + ROW_H), (W, y + ROW_H)], fill=BORDER_C, width=LINE_W)
         y += ROW_H
 
     # ── 3. Footer Branding & Créditos Oficiales ────────────────────────────────
     draw.rectangle([0, y, W - 1, H - 1], fill=(7, 11, 25))
-    draw.line([(0, y), (W, y)], fill=BORDER_C, width=1)
-    _tc(W // 2, y + 18, "REPÚBLICA CARAQUISTA — Plataforma Sabermétrica & Analítica Integral LVBP", fb, GOLD_CLR)
-    _tc(W // 2, y + 40, "Fuentes: MLB Stats API (sportId=17, leagueId=135) · Tom Tango (RE24 / WPA) · BIS Hardness", fs, GRAY_TEXT)
-    _tc(W // 2, y + 62, "Desarrollado por Jorge Leonardo Loreto · AI Data Scientist & Baseball Sabermetrician", fs, DIM_TEXT)
+    draw.line([(0, y), (W, y)], fill=BORDER_C, width=LINE_W)
+    _tc(W // 2, y + int(round(20 * sc)), "REPÚBLICA CARAQUISTA — Plataforma Sabermétrica & Analítica Integral LVBP", fb, GOLD_CLR)
+    _tc(W // 2, y + int(round(44 * sc)), "Fuentes: MLB Stats API (sportId=17, leagueId=135) · Tom Tango (RE24 / WPA) · BIS Hardness", fs, GRAY_TEXT)
+    _tc(W // 2, y + int(round(66 * sc)), "Desarrollado por Jorge Leonardo Loreto · AI Data Scientist & Baseball Sabermetrician", fs, DIM_TEXT)
 
     buf = io.BytesIO()
-    img.save(buf, format="PNG", optimize=True)
+    img.save(buf, format="PNG", dpi=(300, 300), optimize=True)
     return buf.getvalue()

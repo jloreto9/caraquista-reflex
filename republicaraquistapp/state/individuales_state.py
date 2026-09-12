@@ -12,7 +12,7 @@ Cubre:
    y veredicto analítico automatizado.
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 import reflex as rx
 import pandas as pd
 import numpy as np
@@ -78,6 +78,183 @@ def _shorten_name(name: str) -> str:
     return name
 
 
+_PHASE_STATS_CACHE: Dict[Tuple[int, str, bool], List[Dict[str, Any]]] = {}
+
+
+def _parse_batting_records(df_bat: pd.DataFrame) -> List[Dict[str, Any]]:
+    """Transforma un DataFrame de bateo en una lista estructurada con métricas sabermétricas."""
+    if df_bat is None or df_bat.empty:
+        return []
+    bat_list = []
+    for _, row in df_bat.iterrows():
+        p_id = _safe_int(row.get("player_id", 0))
+        name = _safe_str(row.get("player_name", "Desconocido"))
+        t_id = _safe_int(row.get("team_id", 695))
+        t_abbr = _safe_str(row.get("team_abbr", get_team_abbr(t_id)))
+        t_name = _safe_str(row.get("team_name", get_team_name(t_id)))
+        t_logo = get_team_logo(t_id, size=72)
+        ab = _safe_int(row.get("ab", 0))
+        r = _safe_int(row.get("r", 0))
+        h = _safe_int(row.get("h", 0))
+        d2 = _safe_int(row.get("doubles", 0))
+        d3 = _safe_int(row.get("triples", 0))
+        hr = _safe_int(row.get("hr", 0))
+        rbi = _safe_int(row.get("rbi", 0))
+        bb = _safe_int(row.get("bb", 0))
+        so = _safe_int(row.get("so", 0))
+        sb = _safe_int(row.get("sb", 0))
+        cs = _safe_int(row.get("cs", 0))
+        hbp = _safe_int(row.get("hbp", 0))
+        sf = _safe_int(row.get("sf", 0))
+        sh = _safe_int(row.get("sh", 0))
+
+        pa = ab + bb + hbp + sf + sh
+        d1 = max(0, h - d2 - d3 - hr)
+
+        avg = (h / ab) if ab > 0 else 0.0
+        obp_den = ab + bb + hbp + sf
+        obp = ((h + bb + hbp) / obp_den) if obp_den > 0 else 0.0
+        slg = ((d1 + 2 * d2 + 3 * d3 + 4 * hr) / ab) if ab > 0 else 0.0
+        ops = obp + slg
+        iso = (slg - avg) if ab > 0 else 0.0
+
+        babip_den = ab - so - hr + sf
+        babip = ((h - hr) / babip_den) if babip_den > 0 else 0.0
+
+        woba_num = 0.690 * bb + 0.722 * hbp + 0.888 * d1 + 1.271 * d2 + 1.616 * d3 + 2.101 * hr
+        woba_den = ab + bb - 0 + sf + hbp
+        woba = (woba_num / woba_den) if woba_den > 0 else 0.0
+
+        # wRC+ escalado respecto a promedio de liga (.320 wOBA)
+        wrc_plus = int(round((woba / 0.320) * 100)) if pa >= 5 else 100
+
+        bb_pct = round((bb / pa * 100), 1) if pa > 0 else 0.0
+        k_pct = round((so / pa * 100), 1) if pa > 0 else 0.0
+
+        headshot_url = f"https://midfield.mlbstatic.com/v1/people/{p_id}/spots/120" if p_id > 0 else ""
+
+        bat_list.append({
+            "player_id": p_id,
+            "player_name": name,
+            "team_id": t_id,
+            "team_name": t_name,
+            "team_abbr": t_abbr,
+            "team_logo": t_logo,
+            "headshot": headshot_url,
+            "pa": pa,
+            "ab": ab,
+            "r": r,
+            "h": h,
+            "doubles": d2,
+            "triples": d3,
+            "hr": hr,
+            "rbi": rbi,
+            "bb": bb,
+            "so": so,
+            "sb": sb,
+            "cs": cs,
+            "hbp": hbp,
+            "sf": sf,
+            "avg": avg,
+            "avg_str": f"{avg:.3f}".replace("0.", "."),
+            "obp": obp,
+            "obp_str": f"{obp:.3f}".replace("0.", "."),
+            "slg": slg,
+            "slg_str": f"{slg:.3f}".replace("0.", "."),
+            "ops": ops,
+            "ops_str": f"{ops:.3f}",
+            "iso": iso,
+            "iso_str": f"{iso:.3f}".replace("0.", "."),
+            "babip": babip,
+            "babip_str": f"{babip:.3f}".replace("0.", "."),
+            "woba": woba,
+            "woba_str": f"{woba:.3f}".replace("0.", "."),
+            "wrc_plus": wrc_plus,
+            "wrc_color": "green" if wrc_plus >= 100 else "gray",
+            "bb_pct": bb_pct,
+            "bb_pct_str": f"{bb_pct:.1f}%",
+            "k_pct": k_pct,
+            "k_pct_str": f"{k_pct:.1f}%",
+        })
+    return bat_list
+
+
+def _parse_pitching_records(df_pit: pd.DataFrame) -> List[Dict[str, Any]]:
+    """Transforma un DataFrame de pitcheo en una lista estructurada con métricas sabermétricas."""
+    if df_pit is None or df_pit.empty:
+        return []
+    pit_list = []
+    for _, row in df_pit.iterrows():
+        p_id = _safe_int(row.get("player_id", 0))
+        name = _safe_str(row.get("player_name", "Desconocido"))
+        t_id = _safe_int(row.get("team_id", 695))
+        t_abbr = _safe_str(row.get("team_abbr", get_team_abbr(t_id)))
+        t_name = _safe_str(row.get("team_name", get_team_name(t_id)))
+        t_logo = get_team_logo(t_id, size=72)
+        ip = _safe_float(row.get("ip", 0.0))
+        h = _safe_int(row.get("h", 0))
+        r = _safe_int(row.get("r", 0))
+        er = _safe_int(row.get("er", 0))
+        bb = _safe_int(row.get("bb", 0))
+        so = _safe_int(row.get("so", 0))
+        hr = _safe_int(row.get("hr", 0))
+        g = _safe_int(row.get("g", 1))
+        gs = _safe_int(row.get("gs", 0))
+        w = _safe_int(row.get("w", 0))
+        l = _safe_int(row.get("l", 0))
+        sv = _safe_int(row.get("sv", 0))
+        hbp = _safe_int(row.get("hbp", 0))
+
+        era = ((er * 9.0) / ip) if ip > 0 else 0.0
+        whip = ((h + bb) / ip) if ip > 0 else 0.0
+        k9 = ((so * 9.0) / ip) if ip > 0 else 0.0
+        bb9 = ((bb * 9.0) / ip) if ip > 0 else 0.0
+        k_bb = (so / bb) if bb > 0 else float(so)
+        fip_comp = ((13.0 * hr + 3.0 * (bb + hbp) - 2.0 * so) / ip) + 3.20 if ip > 0 else 0.0
+        fip = max(0.0, fip_comp)
+
+        role = "Abridor" if (gs > 0 and gs >= (g / 2)) else "Relevista"
+        headshot_url = f"https://midfield.mlbstatic.com/v1/people/{p_id}/spots/120" if p_id > 0 else ""
+
+        pit_list.append({
+            "player_id": p_id,
+            "player_name": name,
+            "team_id": t_id,
+            "team_name": t_name,
+            "team_abbr": t_abbr,
+            "team_logo": t_logo,
+            "headshot": headshot_url,
+            "role": role,
+            "role_color": "blue" if role == "Abridor" else "purple",
+            "g": g,
+            "gs": gs,
+            "w": w,
+            "l": l,
+            "sv": sv,
+            "ip": ip,
+            "ip_str": f"{ip:.1f}",
+            "h": h,
+            "r": r,
+            "er": er,
+            "bb": bb,
+            "so": so,
+            "hr": hr,
+            "era": era,
+            "era_str": f"{era:.2f}",
+            "whip": whip,
+            "whip_str": f"{whip:.2f}",
+            "k9": k9,
+            "k9_str": f"{k9:.2f}",
+            "bb9": bb9,
+            "bb9_str": f"{bb9:.2f}",
+            "k_bb": k_bb,
+            "k_bb_str": f"{k_bb:.2f}",
+            "fip": fip,
+            "fip_str": f"{fip:.2f}",
+        })
+    return pit_list
+
+
 class IndividualesState(AppState):
     """Estado reactivo para estadísticas individuales y comparador sabermétrico."""
 
@@ -126,6 +303,9 @@ class IndividualesState(AppState):
 
     # ── Filtros del Comparador H2H ──────────────────────────────────────────────
     compare_type: str = "Bateadores"  # "Bateadores" o "Lanzadores"
+    comparator_global_phase: str = "Temporada Regular"
+    comparator_phase_1: str = "Temporada Regular"
+    comparator_phase_2: str = "Temporada Regular"
     comparator_team_1: str = "Toda la LVBP (Overall)"
     comparator_team_2: str = "Toda la LVBP (Overall)"
     selected_player_1: str = ""
@@ -168,11 +348,11 @@ class IndividualesState(AppState):
     # ── Datos de la Comparación H2H ────────────────────────────────────────────
     h2h_rows: List[Dict[str, Any]] = []
     player_1_card: Dict[str, Any] = {
-        "name": "-", "pos": "-", "team": "Leones del Caracas", "team_logo": "/logo.png", "headshot": "", "badge": "CAR",
+        "name": "-", "pos": "-", "team": "Leones del Caracas", "team_logo": "/logo.png", "headshot": "", "badge": "CAR", "phase": "Temporada Regular",
         "kpi_1": "-", "kpi_2": "-", "kpi_3": "-"
     }
     player_2_card: Dict[str, Any] = {
-        "name": "-", "pos": "-", "team": "Leones del Caracas", "team_logo": "/logo.png", "headshot": "", "badge": "CAR",
+        "name": "-", "pos": "-", "team": "Leones del Caracas", "team_logo": "/logo.png", "headshot": "", "badge": "CAR", "phase": "Temporada Regular",
         "kpi_1": "-", "kpi_2": "-", "kpi_3": "-"
     }
     h2h_verdict: str = "Seleccione dos jugadores para generar el veredicto sabermétrico."
@@ -194,13 +374,40 @@ class IndividualesState(AppState):
 
     def _phase_code(self) -> str:
         """Mapea el nombre de la fase en español al código de la BD/API."""
+        return self._phase_code_of(self.selected_phase)
+
+    def _phase_code_of(self, phase_name: str) -> str:
+        """Mapea el nombre de la fase en español al código de la BD/API."""
         mapping = {
             "Temporada Regular": "R",
             "Round Robin": "L",
             "Serie Final": "F",
             "Todas las Fases": "all",
         }
-        return mapping.get(self.selected_phase, "R")
+        return mapping.get(phase_name, "R")
+
+    def _get_dataset_for_phase(self, is_batter: bool, phase_name: str) -> List[Dict[str, Any]]:
+        """Obtiene el conjunto de datos de bateadores o lanzadores para una fase específica con cache."""
+        if phase_name == self.selected_phase:
+            in_memory = self.batting_data_raw if is_batter else self.pitching_data_raw
+            if in_memory:
+                return in_memory
+
+        season = self.selected_season
+        p_code = self._phase_code_of(phase_name)
+        cache_key = (season, p_code, is_batter)
+        if cache_key in _PHASE_STATS_CACHE:
+            return _PHASE_STATS_CACHE[cache_key]
+
+        if is_batter:
+            df = get_batting_stats(team_id=None, limit=600, season=season, phase=p_code)
+            res = _parse_batting_records(df) if (df is not None and not df.empty) else []
+        else:
+            df = get_pitching_stats(team_id=None, limit=600, season=season, phase=p_code)
+            res = _parse_pitching_records(df) if (df is not None and not df.empty) else []
+
+        _PHASE_STATS_CACHE[cache_key] = res
+        return res
 
     def set_selected_phase(self, phase: str):
         """Cambia la fase seleccionada y recarga las estadísticas individuales."""
@@ -222,191 +429,25 @@ class IndividualesState(AppState):
 
         # ── 1. BATEO (Toda la LVBP) ─────────────────────────────────────────────
         df_bat = get_batting_stats(team_id=None, limit=600, season=season, phase=phase)
-        if df_bat is not None and not df_bat.empty:
-            bat_list = []
-            for _, row in df_bat.iterrows():
-                p_id = _safe_int(row.get("player_id", 0))
-                name = _safe_str(row.get("player_name", "Desconocido"))
-                t_id = _safe_int(row.get("team_id", 695))
-                t_abbr = _safe_str(row.get("team_abbr", get_team_abbr(t_id)))
-                t_name = _safe_str(row.get("team_name", get_team_name(t_id)))
-                t_logo = get_team_logo(t_id, size=72)
-                ab = _safe_int(row.get("ab", 0))
-                r = _safe_int(row.get("r", 0))
-                h = _safe_int(row.get("h", 0))
-                d2 = _safe_int(row.get("doubles", 0))
-                d3 = _safe_int(row.get("triples", 0))
-                hr = _safe_int(row.get("hr", 0))
-                rbi = _safe_int(row.get("rbi", 0))
-                bb = _safe_int(row.get("bb", 0))
-                so = _safe_int(row.get("so", 0))
-                sb = _safe_int(row.get("sb", 0))
-                cs = _safe_int(row.get("cs", 0))
-                hbp = _safe_int(row.get("hbp", 0))
-                sf = _safe_int(row.get("sf", 0))
-                sh = _safe_int(row.get("sh", 0))
-
-                pa = ab + bb + hbp + sf + sh
-                d1 = max(0, h - d2 - d3 - hr)
-
-                avg = (h / ab) if ab > 0 else 0.0
-                obp_den = ab + bb + hbp + sf
-                obp = ((h + bb + hbp) / obp_den) if obp_den > 0 else 0.0
-                slg = ((d1 + 2 * d2 + 3 * d3 + 4 * hr) / ab) if ab > 0 else 0.0
-                ops = obp + slg
-                iso = (slg - avg) if ab > 0 else 0.0
-
-                babip_den = ab - so - hr + sf
-                babip = ((h - hr) / babip_den) if babip_den > 0 else 0.0
-
-                woba_num = 0.690 * bb + 0.722 * hbp + 0.888 * d1 + 1.271 * d2 + 1.616 * d3 + 2.101 * hr
-                woba_den = ab + bb - 0 + sf + hbp
-                woba = (woba_num / woba_den) if woba_den > 0 else 0.0
-
-                # wRC+ escalado respecto a promedio de liga (.320 wOBA)
-                wrc_plus = int(round((woba / 0.320) * 100)) if pa >= 5 else 100
-
-                bb_pct = round((bb / pa * 100), 1) if pa > 0 else 0.0
-                k_pct = round((so / pa * 100), 1) if pa > 0 else 0.0
-
-                headshot_url = f"https://midfield.mlbstatic.com/v1/people/{p_id}/spots/120" if p_id > 0 else ""
-
-                bat_list.append({
-                    "player_id": p_id,
-                    "player_name": name,
-                    "team_id": t_id,
-                    "team_name": t_name,
-                    "team_abbr": t_abbr,
-                    "team_logo": t_logo,
-                    "headshot": headshot_url,
-                    "pa": pa,
-                    "ab": ab,
-                    "r": r,
-                    "h": h,
-                    "doubles": d2,
-                    "triples": d3,
-                    "hr": hr,
-                    "rbi": rbi,
-                    "bb": bb,
-                    "so": so,
-                    "sb": sb,
-                    "cs": cs,
-                    "hbp": hbp,
-                    "sf": sf,
-                    "avg": avg,
-                    "avg_str": f"{avg:.3f}".replace("0.", "."),
-                    "obp": obp,
-                    "obp_str": f"{obp:.3f}".replace("0.", "."),
-                    "slg": slg,
-                    "slg_str": f"{slg:.3f}".replace("0.", "."),
-                    "ops": ops,
-                    "ops_str": f"{ops:.3f}",
-                    "iso": iso,
-                    "iso_str": f"{iso:.3f}".replace("0.", "."),
-                    "babip": babip,
-                    "babip_str": f"{babip:.3f}".replace("0.", "."),
-                    "woba": woba,
-                    "woba_str": f"{woba:.3f}".replace("0.", "."),
-                    "wrc_plus": wrc_plus,
-                    "wrc_color": "green" if wrc_plus >= 100 else "gray",
-                    "bb_pct": bb_pct,
-                    "bb_pct_str": f"{bb_pct:.1f}%",
-                    "k_pct": k_pct,
-                    "k_pct_str": f"{k_pct:.1f}%",
-                })
-
-            self.batting_data_raw = bat_list
-            self.available_batters = [
-                f"{p['player_name']} ({p['team_abbr']})"
-                for p in sorted(bat_list, key=lambda x: (x["pa"], x["ops"]), reverse=True)
-            ]
-            self.update_batting_kpis()
-        else:
-            self.batting_data_raw = []
-            self.available_batters = []
+        bat_list = _parse_batting_records(df_bat)
+        _PHASE_STATS_CACHE[(season, phase, True)] = bat_list
+        self.batting_data_raw = bat_list
+        self.available_batters = [
+            f"{p['player_name']} ({p['team_abbr']})"
+            for p in sorted(bat_list, key=lambda x: (x["pa"], x["ops"]), reverse=True)
+        ]
+        self.update_batting_kpis()
 
         # ── 2. PITCHEO (Toda la LVBP) ───────────────────────────────────────────
         df_pit = get_pitching_stats(team_id=None, limit=600, season=season, phase=phase)
-        if df_pit is not None and not df_pit.empty:
-            pit_list = []
-            for _, row in df_pit.iterrows():
-                p_id = _safe_int(row.get("player_id", 0))
-                name = _safe_str(row.get("player_name", "Desconocido"))
-                t_id = _safe_int(row.get("team_id", 695))
-                t_abbr = _safe_str(row.get("team_abbr", get_team_abbr(t_id)))
-                t_name = _safe_str(row.get("team_name", get_team_name(t_id)))
-                t_logo = get_team_logo(t_id, size=72)
-                ip = _safe_float(row.get("ip", 0.0))
-                h = _safe_int(row.get("h", 0))
-                r = _safe_int(row.get("r", 0))
-                er = _safe_int(row.get("er", 0))
-                bb = _safe_int(row.get("bb", 0))
-                so = _safe_int(row.get("so", 0))
-                hr = _safe_int(row.get("hr", 0))
-                g = _safe_int(row.get("g", 1))
-                gs = _safe_int(row.get("gs", 0))
-                w = _safe_int(row.get("w", 0))
-                l = _safe_int(row.get("l", 0))
-                sv = _safe_int(row.get("sv", 0))
-                hbp = _safe_int(row.get("hbp", 0))
-
-                era = ((er * 9.0) / ip) if ip > 0 else 0.0
-                whip = ((h + bb) / ip) if ip > 0 else 0.0
-                k9 = ((so * 9.0) / ip) if ip > 0 else 0.0
-                bb9 = ((bb * 9.0) / ip) if ip > 0 else 0.0
-                k_bb = (so / bb) if bb > 0 else float(so)
-                fip_comp = ((13.0 * hr + 3.0 * (bb + hbp) - 2.0 * so) / ip) + 3.20 if ip > 0 else 0.0
-                fip = max(0.0, fip_comp)
-
-                role = "Abridor" if (gs > 0 and gs >= (g / 2)) else "Relevista"
-                headshot_url = f"https://midfield.mlbstatic.com/v1/people/{p_id}/spots/120" if p_id > 0 else ""
-
-                pit_list.append({
-                    "player_id": p_id,
-                    "player_name": name,
-                    "team_id": t_id,
-                    "team_name": t_name,
-                    "team_abbr": t_abbr,
-                    "team_logo": t_logo,
-                    "headshot": headshot_url,
-                    "role": role,
-                    "role_color": "blue" if role == "Abridor" else "purple",
-                    "g": g,
-                    "gs": gs,
-                    "w": w,
-                    "l": l,
-                    "sv": sv,
-                    "ip": ip,
-                    "ip_str": f"{ip:.1f}",
-                    "h": h,
-                    "r": r,
-                    "er": er,
-                    "bb": bb,
-                    "so": so,
-                    "hr": hr,
-                    "era": era,
-                    "era_str": f"{era:.2f}",
-                    "whip": whip,
-                    "whip_str": f"{whip:.2f}",
-                    "k9": k9,
-                    "k9_str": f"{k9:.2f}",
-                    "bb9": bb9,
-                    "bb9_str": f"{bb9:.2f}",
-                    "k_bb": k_bb,
-                    "k_bb_str": f"{k_bb:.2f}",
-                    "fip": fip,
-                    "fip_str": f"{fip:.2f}",
-                })
-
-            self.pitching_data_raw = pit_list
-            self.available_pitchers = [
-                f"{p['player_name']} ({p['team_abbr']})"
-                for p in sorted(pit_list, key=lambda x: (x["ip"], x["so"]), reverse=True)
-            ]
-            self.update_pitching_kpis()
-        else:
-            self.pitching_data_raw = []
-            self.available_pitchers = []
+        pit_list = _parse_pitching_records(df_pit)
+        _PHASE_STATS_CACHE[(season, phase, False)] = pit_list
+        self.pitching_data_raw = pit_list
+        self.available_pitchers = [
+            f"{p['player_name']} ({p['team_abbr']})"
+            for p in sorted(pit_list, key=lambda x: (x["ip"], x["so"]), reverse=True)
+        ]
+        self.update_pitching_kpis()
 
         # ── 3. FILDEO / DEFENSA (Toda la LVBP) ──────────────────────────────────
         df_fld = get_individual_fielding_stats(season=season, team_id=None, phase=phase)
@@ -648,19 +689,17 @@ class IndividualesState(AppState):
     def set_selected_fielding_pos(self, val: str):
         self.selected_fielding_pos = val
 
-    def _get_team_player_names(self, team: str, is_batter: bool) -> List[str]:
+    def _get_team_player_names(self, team: str, is_batter: bool, phase_name: Optional[str] = None) -> List[str]:
+        target_phase = phase_name or self.selected_phase
+        data = self._get_dataset_for_phase(is_batter=is_batter, phase_name=target_phase)
+        if team != "Toda la LVBP (Overall)":
+            data = [p for p in data if p.get("team_name") == team]
         if is_batter:
-            data = self.batting_data_raw
-            if team != "Toda la LVBP (Overall)":
-                data = [p for p in data if p.get("team_name") == team]
             return [
                 f"{p['player_name']} ({p.get('team_abbr', 'LVBP')})"
                 for p in sorted(data, key=lambda x: (x.get("pa", 0), x.get("ops", 0.0)), reverse=True)
             ]
         else:
-            data = self.pitching_data_raw
-            if team != "Toda la LVBP (Overall)":
-                data = [p for p in data if p.get("team_name") == team]
             return [
                 f"{p['player_name']} ({p.get('team_abbr', 'LVBP')})"
                 for p in sorted(data, key=lambda x: (x.get("ip", 0.0), x.get("so", 0)), reverse=True)
@@ -669,7 +708,7 @@ class IndividualesState(AppState):
     def set_comparator_team_1(self, val: str):
         self.comparator_team_1 = val
         is_batter = (self.compare_type == "Bateadores")
-        avail = self._get_team_player_names(val, is_batter)
+        avail = self._get_team_player_names(val, is_batter, self.comparator_phase_1)
         if avail and (not self.selected_player_1 or self.selected_player_1 not in avail):
             self.selected_player_1 = avail[0]
         self.update_h2h_comparison()
@@ -677,16 +716,45 @@ class IndividualesState(AppState):
     def set_comparator_team_2(self, val: str):
         self.comparator_team_2 = val
         is_batter = (self.compare_type == "Bateadores")
-        avail = self._get_team_player_names(val, is_batter)
+        avail = self._get_team_player_names(val, is_batter, self.comparator_phase_2)
         if avail and (not self.selected_player_2 or self.selected_player_2 not in avail):
             self.selected_player_2 = avail[0]
+        self.update_h2h_comparison()
+
+    def set_comparator_phase_1(self, val: str):
+        self.comparator_phase_1 = val
+        is_bat = (self.compare_type == "Bateadores")
+        avail = self._get_team_player_names(self.comparator_team_1, is_bat, val)
+        if avail and (not self.selected_player_1 or self.selected_player_1 not in avail):
+            self.selected_player_1 = avail[0]
+        self.update_h2h_comparison()
+
+    def set_comparator_phase_2(self, val: str):
+        self.comparator_phase_2 = val
+        is_bat = (self.compare_type == "Bateadores")
+        avail = self._get_team_player_names(self.comparator_team_2, is_bat, val)
+        if avail and (not self.selected_player_2 or self.selected_player_2 not in avail):
+            self.selected_player_2 = avail[0]
+        self.update_h2h_comparison()
+
+    def set_comparator_global_phase(self, val: str):
+        self.comparator_global_phase = val
+        self.comparator_phase_1 = val
+        self.comparator_phase_2 = val
+        is_bat = (self.compare_type == "Bateadores")
+        avail1 = self._get_team_player_names(self.comparator_team_1, is_bat, val)
+        avail2 = self._get_team_player_names(self.comparator_team_2, is_bat, val)
+        if avail1 and (not self.selected_player_1 or self.selected_player_1 not in avail1):
+            self.selected_player_1 = avail1[0]
+        if avail2 and (not self.selected_player_2 or self.selected_player_2 not in avail2):
+            self.selected_player_2 = avail2[1] if (len(avail2) > 1 and avail1 == avail2) else avail2[0]
         self.update_h2h_comparison()
 
     def set_compare_type(self, val: str):
         self.compare_type = val
         is_bat = (val == "Bateadores")
-        avail1 = self._get_team_player_names(self.comparator_team_1, is_bat)
-        avail2 = self._get_team_player_names(self.comparator_team_2, is_bat)
+        avail1 = self._get_team_player_names(self.comparator_team_1, is_bat, self.comparator_phase_1)
+        avail2 = self._get_team_player_names(self.comparator_team_2, is_bat, self.comparator_phase_2)
         if avail1:
             self.selected_player_1 = avail1[0]
         if avail2:
@@ -702,7 +770,7 @@ class IndividualesState(AppState):
         self.update_h2h_comparison()
 
     def download_matchup_card(self):
-        """Genera y descarga la tarjeta gráfica Matchup 360 en formato PNG."""
+        """Genera y descarga la tarjeta gráfica Matchup 360 en formato PNG de alta definición (300 DPI)."""
         self.is_generating_card = True
         try:
             is_batter = (self.compare_type == "Bateadores")
@@ -714,11 +782,15 @@ class IndividualesState(AppState):
                 is_batter=is_batter,
                 season=season,
                 phase=self.selected_phase,
+                phase_1=self.comparator_phase_1,
+                phase_2=self.comparator_phase_2,
+                scale=2.0,
             )
             safe1 = "".join(c for c in str(self.selected_player_1) if c.isalnum() or c in (" ", "_")).strip().replace(" ", "_") or "Jugador1"
             safe2 = "".join(c for c in str(self.selected_player_2) if c.isalnum() or c in (" ", "_")).strip().replace(" ", "_") or "Jugador2"
-            safe_phase = "".join(c for c in str(self.selected_phase) if c.isalnum() or c in (" ", "_")).strip().replace(" ", "_")
-            filename = f"LVBP360_Matchup_{safe1}_vs_{safe2}_{season}_{safe_phase}.png"
+            p1_sf = "".join(c for c in str(self.comparator_phase_1) if c.isalnum() or c in (" ", "_")).strip().replace(" ", "_")
+            p2_sf = "".join(c for c in str(self.comparator_phase_2) if c.isalnum() or c in (" ", "_")).strip().replace(" ", "_")
+            filename = f"LVBP360_Matchup_{safe1}_{p1_sf}_vs_{safe2}_{p2_sf}_{season}.png"
             return rx.download(data=png_bytes, filename=filename, mime_type="image/png")
         finally:
             self.is_generating_card = False
@@ -726,19 +798,19 @@ class IndividualesState(AppState):
 
     @rx.var
     def available_batters_p1(self) -> List[str]:
-        return self._get_team_player_names(self.comparator_team_1, is_batter=True)
+        return self._get_team_player_names(self.comparator_team_1, is_batter=True, phase_name=self.comparator_phase_1)
 
     @rx.var
     def available_batters_p2(self) -> List[str]:
-        return self._get_team_player_names(self.comparator_team_2, is_batter=True)
+        return self._get_team_player_names(self.comparator_team_2, is_batter=True, phase_name=self.comparator_phase_2)
 
     @rx.var
     def available_pitchers_p1(self) -> List[str]:
-        return self._get_team_player_names(self.comparator_team_1, is_batter=False)
+        return self._get_team_player_names(self.comparator_team_1, is_batter=False, phase_name=self.comparator_phase_1)
 
     @rx.var
     def available_pitchers_p2(self) -> List[str]:
-        return self._get_team_player_names(self.comparator_team_2, is_batter=False)
+        return self._get_team_player_names(self.comparator_team_2, is_batter=False, phase_name=self.comparator_phase_2)
 
     # ── Computed Properties: Listas Filtradas ───────────────────────────────────
     @rx.var
@@ -884,8 +956,8 @@ class IndividualesState(AppState):
             return
 
         if self.compare_type == "Bateadores":
-            p1 = _find_player(self.batting_data_raw, self.selected_player_1)
-            p2 = _find_player(self.batting_data_raw, self.selected_player_2)
+            p1 = _find_player(self._get_dataset_for_phase(True, self.comparator_phase_1), self.selected_player_1)
+            p2 = _find_player(self._get_dataset_for_phase(True, self.comparator_phase_2), self.selected_player_2)
             if not p1 or not p2:
                 self.h2h_verdict = "Seleccione dos jugadores para generar la comparativa sabermétrica."
                 self.h2h_rows = []
@@ -900,6 +972,7 @@ class IndividualesState(AppState):
                 "team_logo": p1.get("team_logo") or get_team_logo(t1_id, size=72),
                 "headshot": p1.get("headshot", ""),
                 "badge": p1.get("team_abbr", "CAR"),
+                "phase": self.comparator_phase_1,
                 "kpi_1": f"AVG {p1['avg_str']}",
                 "kpi_2": f"OPS {p1['ops_str']}",
                 "kpi_3": f"{p1['hr']} HR",
@@ -911,6 +984,7 @@ class IndividualesState(AppState):
                 "team_logo": p2.get("team_logo") or get_team_logo(t2_id, size=72),
                 "headshot": p2.get("headshot", ""),
                 "badge": p2.get("team_abbr", "LVBP"),
+                "phase": self.comparator_phase_2,
                 "kpi_1": f"AVG {p2['avg_str']}",
                 "kpi_2": f"OPS {p2['ops_str']}",
                 "kpi_3": f"{p2['hr']} HR",
@@ -1066,8 +1140,8 @@ class IndividualesState(AppState):
 
         else:
             # LANZADORES
-            p1 = _find_player(self.pitching_data_raw, self.selected_player_1)
-            p2 = _find_player(self.pitching_data_raw, self.selected_player_2)
+            p1 = _find_player(self._get_dataset_for_phase(False, self.comparator_phase_1), self.selected_player_1)
+            p2 = _find_player(self._get_dataset_for_phase(False, self.comparator_phase_2), self.selected_player_2)
             if not p1 or not p2:
                 self.h2h_verdict = "Seleccione dos jugadores para generar la comparativa sabermétrica."
                 self.h2h_rows = []
@@ -1082,6 +1156,7 @@ class IndividualesState(AppState):
                 "team_logo": p1.get("team_logo") or get_team_logo(t1_id, size=72),
                 "headshot": p1.get("headshot", ""),
                 "badge": p1.get("team_abbr", "CAR"),
+                "phase": self.comparator_phase_1,
                 "kpi_1": f"ERA {p1['era_str']}",
                 "kpi_2": f"WHIP {p1['whip_str']}",
                 "kpi_3": f"{p1['so']} K",
@@ -1093,6 +1168,7 @@ class IndividualesState(AppState):
                 "team_logo": p2.get("team_logo") or get_team_logo(t2_id, size=72),
                 "headshot": p2.get("headshot", ""),
                 "badge": p2.get("team_abbr", "LVBP"),
+                "phase": self.comparator_phase_2,
                 "kpi_1": f"ERA {p2['era_str']}",
                 "kpi_2": f"WHIP {p2['whip_str']}",
                 "kpi_3": f"{p2['so']} K",
@@ -1210,11 +1286,14 @@ class IndividualesState(AppState):
             return []
 
         if self.compare_type == "Bateadores":
-            p1 = _find_player(self.batting_data_raw, self.selected_player_1)
-            p2 = _find_player(self.batting_data_raw, self.selected_player_2)
-            pool = [p for p in self.batting_data_raw if p["ab"] >= 5] or self.batting_data_raw
+            data1 = self._get_dataset_for_phase(is_batter=True, phase_name=self.comparator_phase_1)
+            data2 = self._get_dataset_for_phase(is_batter=True, phase_name=self.comparator_phase_2)
+            p1 = _find_player(data1, self.selected_player_1)
+            p2 = _find_player(data2, self.selected_player_2)
+            pool1 = [p for p in data1 if p["ab"] >= 5] or data1
+            pool2 = [p for p in data2 if p["ab"] >= 5] or data2
 
-            if not p1 or not p2 or not pool:
+            if not p1 or not p2 or not pool1 or not pool2:
                 return []
 
             axes = [
@@ -1228,7 +1307,7 @@ class IndividualesState(AppState):
                 ("Paciencia (BB%)", "bb_pct", "bb_pct_str", True),
             ]
 
-            def get_pct(val, key, higher_better):
+            def get_pct(val, key, higher_better, pool):
                 vals = [x.get(key, 0) for x in pool]
                 if not vals:
                     return 50
@@ -1243,8 +1322,8 @@ class IndividualesState(AppState):
                 v2_raw = p2.get(key, 0)
                 v1_str = str(p1.get(str_key, v1_raw))
                 v2_str = str(p2.get(str_key, v2_raw))
-                pct1 = get_pct(v1_raw, key, higher_better)
-                pct2 = get_pct(v2_raw, key, higher_better)
+                pct1 = get_pct(v1_raw, key, higher_better, pool1)
+                pct2 = get_pct(v2_raw, key, higher_better, pool2)
 
                 if pct1 > pct2:
                     leader = f"{_shorten_name(p1['player_name'])} ({p1.get('team_abbr', 'CAR')})"
@@ -1271,11 +1350,14 @@ class IndividualesState(AppState):
 
         else:
             # Lanzadores
-            p1 = _find_player(self.pitching_data_raw, self.selected_player_1)
-            p2 = _find_player(self.pitching_data_raw, self.selected_player_2)
-            pool = [p for p in self.pitching_data_raw if p["ip"] >= 2.0] or self.pitching_data_raw
+            data1 = self._get_dataset_for_phase(is_batter=False, phase_name=self.comparator_phase_1)
+            data2 = self._get_dataset_for_phase(is_batter=False, phase_name=self.comparator_phase_2)
+            p1 = _find_player(data1, self.selected_player_1)
+            p2 = _find_player(data2, self.selected_player_2)
+            pool1 = [p for p in data1 if p["ip"] >= 2.0] or data1
+            pool2 = [p for p in data2 if p["ip"] >= 2.0] or data2
 
-            if not p1 or not p2 or not pool:
+            if not p1 or not p2 or not pool1 or not pool2:
                 return []
 
             axes_p = [
@@ -1289,7 +1371,7 @@ class IndividualesState(AppState):
                 ("Ponches (SO)", "so", "so", True),
             ]
 
-            def get_pct_p(val, key, higher_better):
+            def get_pct_p(val, key, higher_better, pool):
                 vals = [x.get(key, 0) for x in pool]
                 if not vals:
                     return 50
@@ -1304,8 +1386,8 @@ class IndividualesState(AppState):
                 v2_raw = p2.get(key, 0)
                 v1_str = str(p1.get(str_key, v1_raw))
                 v2_str = str(p2.get(str_key, v2_raw))
-                pct1 = get_pct_p(v1_raw, key, higher_better)
-                pct2 = get_pct_p(v2_raw, key, higher_better)
+                pct1 = get_pct_p(v1_raw, key, higher_better, pool1)
+                pct2 = get_pct_p(v2_raw, key, higher_better, pool2)
 
                 if pct1 > pct2:
                     leader = f"{_shorten_name(p1['player_name'])} ({p1.get('team_abbr', 'CAR')})"
@@ -1336,11 +1418,14 @@ class IndividualesState(AppState):
         fig = go.Figure()
 
         if self.compare_type == "Bateadores":
-            p1 = _find_player(self.batting_data_raw, self.selected_player_1)
-            p2 = _find_player(self.batting_data_raw, self.selected_player_2)
-            pool = [p for p in self.batting_data_raw if p["ab"] >= 5] or self.batting_data_raw
+            data1 = self._get_dataset_for_phase(is_batter=True, phase_name=self.comparator_phase_1)
+            data2 = self._get_dataset_for_phase(is_batter=True, phase_name=self.comparator_phase_2)
+            p1 = _find_player(data1, self.selected_player_1)
+            p2 = _find_player(data2, self.selected_player_2)
+            pool1 = [p for p in data1 if p["ab"] >= 5] or data1
+            pool2 = [p for p in data2 if p["ab"] >= 5] or data2
 
-            if not p1 or not p2 or not pool:
+            if not p1 or not p2 or not pool1 or not pool2:
                 fig.update_layout(template="plotly_dark", height=420)
                 return fig
 
@@ -1355,7 +1440,7 @@ class IndividualesState(AppState):
                 ("Paciencia (BB%)", "bb_pct", True),
             ]
 
-            def get_pct(val, key, higher_better):
+            def get_pct(val, key, higher_better, pool):
                 vals = [x.get(key, 0) for x in pool]
                 if not vals:
                     return 50
@@ -1364,8 +1449,8 @@ class IndividualesState(AppState):
                 else:
                     return min(100, max(5, int((sum(1 for v in vals if v >= val) / len(vals)) * 100)))
 
-            r1 = [get_pct(p1.get(k, 0), k, hb) for _, k, hb in axes]
-            r2 = [get_pct(p2.get(k, 0), k, hb) for _, k, hb in axes]
+            r1 = [get_pct(p1.get(k, 0), k, hb, pool1) for _, k, hb in axes]
+            r2 = [get_pct(p2.get(k, 0), k, hb, pool2) for _, k, hb in axes]
             theta = [name for name, _, _ in axes]
 
             # Cerrar el loop del radar
@@ -1373,13 +1458,20 @@ class IndividualesState(AppState):
             r2.append(r2[0])
             theta.append(theta[0])
 
+            lbl1 = f"🔴 {p1['player_name']} ({p1.get('team_abbr', 'CAR')})"
+            if self.comparator_phase_1 != self.comparator_phase_2:
+                lbl1 += f" [{self.comparator_phase_1}]"
+            lbl2 = f"🔵 {p2['player_name']} ({p2.get('team_abbr', 'LVBP')})"
+            if self.comparator_phase_1 != self.comparator_phase_2:
+                lbl2 += f" [{self.comparator_phase_2}]"
+
             fig.add_trace(go.Scatterpolar(
                 r=r1,
                 theta=theta,
                 fill="toself",
                 fillcolor="rgba(253, 184, 39, 0.25)",
                 line=dict(color="#FDB827", width=3),
-                name=f"🔴 {p1['player_name']} ({p1.get('team_abbr', 'CAR')})",
+                name=lbl1,
             ))
             fig.add_trace(go.Scatterpolar(
                 r=r2,
@@ -1387,16 +1479,19 @@ class IndividualesState(AppState):
                 fill="toself",
                 fillcolor="rgba(56, 189, 248, 0.25)",
                 line=dict(color="#38BDF8", width=3),
-                name=f"🔵 {p2['player_name']} ({p2.get('team_abbr', 'LVBP')})",
+                name=lbl2,
             ))
 
         else:
             # LANZADORES
-            p1 = _find_player(self.pitching_data_raw, self.selected_player_1)
-            p2 = _find_player(self.pitching_data_raw, self.selected_player_2)
-            pool = [p for p in self.pitching_data_raw if p["ip"] >= 2.0] or self.pitching_data_raw
+            data1 = self._get_dataset_for_phase(is_batter=False, phase_name=self.comparator_phase_1)
+            data2 = self._get_dataset_for_phase(is_batter=False, phase_name=self.comparator_phase_2)
+            p1 = _find_player(data1, self.selected_player_1)
+            p2 = _find_player(data2, self.selected_player_2)
+            pool1 = [p for p in data1 if p["ip"] >= 2.0] or data1
+            pool2 = [p for p in data2 if p["ip"] >= 2.0] or data2
 
-            if not p1 or not p2 or not pool:
+            if not p1 or not p2 or not pool1 or not pool2:
                 fig.update_layout(template="plotly_dark", height=420)
                 return fig
 
@@ -1411,7 +1506,7 @@ class IndividualesState(AppState):
                 ("Ponches (SO)", "so", True),
             ]
 
-            def get_pct_p(val, key, higher_better):
+            def get_pct_p(val, key, higher_better, pool):
                 vals = [x.get(key, 0) for x in pool]
                 if not vals:
                     return 50
@@ -1420,13 +1515,20 @@ class IndividualesState(AppState):
                 else:
                     return min(100, max(5, int((sum(1 for v in vals if v >= val) / len(vals)) * 100)))
 
-            r1 = [get_pct_p(p1.get(k, 0), k, hb) for _, k, hb in axes_p]
-            r2 = [get_pct_p(p2.get(k, 0), k, hb) for _, k, hb in axes_p]
+            r1 = [get_pct_p(p1.get(k, 0), k, hb, pool1) for _, k, hb in axes_p]
+            r2 = [get_pct_p(p2.get(k, 0), k, hb, pool2) for _, k, hb in axes_p]
             theta_p = [name for name, _, _ in axes_p]
 
             r1.append(r1[0])
             r2.append(r2[0])
             theta_p.append(theta_p[0])
+
+            lbl1 = f"🔴 {p1['player_name']} ({p1.get('team_abbr', 'CAR')})"
+            if self.comparator_phase_1 != self.comparator_phase_2:
+                lbl1 += f" [{self.comparator_phase_1}]"
+            lbl2 = f"🔵 {p2['player_name']} ({p2.get('team_abbr', 'LVBP')})"
+            if self.comparator_phase_1 != self.comparator_phase_2:
+                lbl2 += f" [{self.comparator_phase_2}]"
 
             fig.add_trace(go.Scatterpolar(
                 r=r1,
@@ -1434,7 +1536,7 @@ class IndividualesState(AppState):
                 fill="toself",
                 fillcolor="rgba(253, 184, 39, 0.25)",
                 line=dict(color="#FDB827", width=3),
-                name=f"🔴 {p1['player_name']} ({p1.get('team_abbr', 'CAR')})",
+                name=lbl1,
             ))
             fig.add_trace(go.Scatterpolar(
                 r=r2,
@@ -1442,7 +1544,7 @@ class IndividualesState(AppState):
                 fill="toself",
                 fillcolor="rgba(56, 189, 248, 0.25)",
                 line=dict(color="#38BDF8", width=3),
-                name=f"🔵 {p2['player_name']} ({p2.get('team_abbr', 'LVBP')})",
+                name=lbl2,
             ))
 
         fig.update_layout(

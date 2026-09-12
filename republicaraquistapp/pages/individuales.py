@@ -285,6 +285,7 @@ def player_profile_card(card: Dict[str, Any], border_color: str, tag_color: str)
                 rx.hstack(
                     rx.heading(card["name"], size="3", font_weight="800", color=TEXT_PRIMARY),
                     rx.badge(card["badge"], color_scheme=tag_color, variant="solid", size="1"),
+                    rx.badge(card["phase"], color_scheme="gray", variant="surface", size="1"),
                     align="center",
                     spacing="2",
                 ),
@@ -779,14 +780,36 @@ def comparator_tab_view() -> rx.Component:
                         spacing="2",
                     ),
                     rx.spacer(),
+                    rx.hstack(
+                        rx.icon("calendar", size=16, color=ACCENT_GOLD),
+                        rx.text("Sincronizar Fase:", size="2", font_weight="700", color=ACCENT_GOLD),
+                        rx.select(
+                            IndividualesState.phase_options,
+                            value=IndividualesState.comparator_global_phase,
+                            on_change=IndividualesState.set_comparator_global_phase,
+                            size="2",
+                            variant="soft",
+                            color_scheme="amber",
+                        ),
+                        align="center",
+                        spacing="2",
+                    ),
                     align="center",
                     width="100%",
+                    wrap="wrap",
                 ),
                 rx.hstack(
                     # Jugador 1
                     rx.hstack(
                         rx.badge("1", color_scheme="amber", variant="solid", radius="full"),
-                        rx.text("Equipo 1:", size="2", font_weight="700", color="#FDB827"),
+                        rx.select(
+                            IndividualesState.phase_options,
+                            value=IndividualesState.comparator_phase_1,
+                            on_change=IndividualesState.set_comparator_phase_1,
+                            size="2",
+                            variant="soft",
+                            color_scheme="amber",
+                        ),
                         rx.select(
                             IndividualesState.team_options,
                             value=IndividualesState.comparator_team_1,
@@ -808,12 +831,20 @@ def comparator_tab_view() -> rx.Component:
                         ),
                         align="center",
                         spacing="2",
+                        wrap="wrap",
                     ),
                     rx.text("VS", size="3", font_weight="900", color=TEXT_MUTED, padding_x="0.5rem"),
                     # Jugador 2
                     rx.hstack(
                         rx.badge("2", color_scheme="blue", variant="solid", radius="full"),
-                        rx.text("Equipo 2:", size="2", font_weight="700", color="#38BDF8"),
+                        rx.select(
+                            IndividualesState.phase_options,
+                            value=IndividualesState.comparator_phase_2,
+                            on_change=IndividualesState.set_comparator_phase_2,
+                            size="2",
+                            variant="soft",
+                            color_scheme="blue",
+                        ),
                         rx.select(
                             IndividualesState.team_options,
                             value=IndividualesState.comparator_team_2,
@@ -835,6 +866,7 @@ def comparator_tab_view() -> rx.Component:
                         ),
                         align="center",
                         spacing="2",
+                        wrap="wrap",
                     ),
                     align="center",
                     spacing="3",

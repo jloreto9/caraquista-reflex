@@ -559,8 +559,10 @@ class TestMatchup360CardImageExport(unittest.TestCase):
     """Verifica la generación de la tarjeta gráfica Matchup 360 (PNG) y créditos."""
 
     def test_build_matchup_image_png_header(self):
-        """La función build_matchup_image debe generar bytes de PNG válidos."""
+        """La función build_matchup_image debe generar bytes de PNG válidos a 300 DPI y 1360px de ancho."""
         from core.matchup_card import build_matchup_image
+        import io
+        from PIL import Image
 
         p1 = {"name": "José Rondón", "badge": "CAR", "pos": "OF", "headshot": None, "team_logo": None}
         p2 = {"name": "Renato Núñez", "badge": "MAG", "pos": "1B", "headshot": None, "team_logo": None}
@@ -569,11 +571,66 @@ class TestMatchup360CardImageExport(unittest.TestCase):
             {"category": "Ofensiva", "metric": "wRC+", "val_1": "155", "val_2": "142", "winner": "José Rondón (CAR)", "is_header": False},
             {"category": "Volumen", "metric": "HR", "val_1": "12", "val_2": "14", "winner": "Renato Núñez (MAG)", "is_header": False},
         ]
-        png_bytes = build_matchup_image(p1, p2, rows, is_batter=True, season=2025)
+        png_bytes = build_matchup_image(p1, p2, rows, is_batter=True, season=2025, phase_1="Temporada Regular", phase_2="Round Robin")
         self.assertIsInstance(png_bytes, bytes)
         self.assertTrue(len(png_bytes) > 5000)
         # Magic bytes oficiales de formato PNG (\x89PNG\r\n\x1a\n)
         self.assertEqual(png_bytes[:8], b"\x89PNG\r\n\x1a\n")
+
+        # Verificar dimensiones y DPI
+        im = Image.open(io.BytesIO(png_bytes))
+        self.assertEqual(im.format, "PNG")
+        self.assertEqual(im.size[0], 1360)  # 680 * 2.0 (escala HD)
+        dpi = im.info.get("dpi")
+        self.assertIsNotNone(dpi)
+        self.assertAlmostEqual(dpi[0], 300.0, delta=1.0)
+        self.assertAlmostEqual(dpi[1], 300.0, delta=1.0)
+
+    def test_comparator_cross_phase_support(self):
+        """IndividualesState debe soportar fases independientes para jugador 1 y jugador 2."""
+        state = IndividualesState()
+        state.comparator_phase_1 = "Temporada Regular"
+        state.comparator_phase_2 = "Round Robin"
+
+        # Simular datasets cargados para ambas fases
+        reg_batters = [
+            {
+                "player_id": 100, "player_name": "Leandro Cedeño", "team_id": 695, "team_abbr": "CAR",
+                "team_name": "Leones del Caracas", "headshot": "", "role": "Bateador", "pos": "1B",
+                "ab": 110, "pa": 130, "h": 33, "hr": 8, "rbi": 25, "r": 20, "bb": 15, "so": 20,
+                "avg": 0.300, "avg_str": ".300", "obp": 0.380, "obp_str": ".380", "slg": 0.550, "slg_str": ".550",
+                "ops": 0.930, "ops_str": "0.930", "iso": 0.250, "iso_str": ".250", "babip": 0.310, "babip_str": ".310",
+                "woba": 0.405, "woba_str": ".405", "wrc_plus": 145, "bb_pct": 11.5, "bb_pct_str": "11.5%", "k_pct": 15.4, "k_pct_str": "15.4%",
+            }
+        ]
+        rr_batters = [
+            {
+                "player_id": 100, "player_name": "Leandro Cedeño", "team_id": 693, "team_abbr": "MAG",
+                "team_name": "Navegantes del Magallanes", "headshot": "", "role": "Bateador", "pos": "1B",
+                "ab": 60, "pa": 70, "h": 20, "hr": 5, "rbi": 18, "r": 12, "bb": 8, "so": 12,
+                "avg": 0.333, "avg_str": ".333", "obp": 0.400, "obp_str": ".400", "slg": 0.610, "slg_str": ".610",
+                "ops": 1.010, "ops_str": "1.010", "iso": 0.277, "iso_str": ".277", "babip": 0.340, "babip_str": ".340",
+                "woba": 0.430, "woba_str": ".430", "wrc_plus": 160, "bb_pct": 11.4, "bb_pct_str": "11.4%", "k_pct": 17.1, "k_pct_str": "17.1%",
+            }
+        ]
+
+        from republicaraquistapp.state.individuales_state import _PHASE_STATS_CACHE
+        _PHASE_STATS_CACHE[(2025, "R", True)] = reg_batters
+        _PHASE_STATS_CACHE[(2025, "L", True)] = rr_batters
+
+        state.selected_season = 2025
+        state.selected_player_1 = "Leandro Cedeño (CAR)"
+        state.selected_player_2 = "Leandro Cedeño (MAG)"
+        state.update_h2h_comparison()
+
+        self.assertEqual(state.player_1_card["badge"], "CAR")
+        self.assertEqual(state.player_1_card["phase"], "Temporada Regular")
+        self.assertEqual(state.player_2_card["badge"], "MAG")
+        self.assertEqual(state.player_2_card["phase"], "Round Robin")
+
+        # Descarga con nombres de fases en el archivo
+        event = state.download_matchup_card()
+        self.assertIsNotNone(event)
 
     def test_download_matchup_card_event_spec(self):
         """IndividualesState.download_matchup_card() debe retornar un EventSpec de descarga de Reflex."""
