@@ -1,4 +1,4 @@
-﻿# ========================================================
+# ========================================================
 # Stage 1: Build Frontend and Compile Assets
 # ========================================================
 FROM python:3.12-slim AS builder
@@ -48,11 +48,16 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # Copy app code, core modules, and built web assets
 COPY --from=builder /app /app
 
-# Copy Caddy reverse proxy config
+# Copy Caddy reverse proxy config and entrypoint
 COPY Caddyfile /etc/caddy/Caddyfile
+COPY entrypoint.sh /app/entrypoint.sh
+RUN sed -i 's/\r$//' /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 EXPOSE 3000
 
 ENV PYTHONUNBUFFERED=1
+ENV REFLEX_TELEMETRY_ENABLED=false
+ENV GRANIAN_WORKERS=1
 
-CMD ["sh", "-c", "echo 'Iniciando backend Reflex...' && reflex run --backend-only --backend-port 8000 --env prod & echo 'Iniciando Caddy proxy en puerto 3000...' && exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile"]
+ENTRYPOINT ["/app/entrypoint.sh"]
+

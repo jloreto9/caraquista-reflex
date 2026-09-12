@@ -109,3 +109,14 @@ app.add_page(
     image="/logo.png",
     on_load=BullpenState.on_load_bullpen
 )
+
+# ── Endpoint de Healthcheck /ping ──────────────────────────────────────────
+from starlette.responses import JSONResponse
+
+async def ping_endpoint(request):
+    """Endpoint de salud para Caddy y monitoreo Docker."""
+    return JSONResponse({"status": "ok", "app": "caraquista-reflex"})
+
+app._api.add_route("/ping", ping_endpoint, methods=["GET", "HEAD"])
+
+

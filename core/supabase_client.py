@@ -1,4 +1,9 @@
 import os
+import httpcore
+import httpx
+import postgrest
+import storage3
+import supabase_auth
 from supabase import create_client, Client
 import pandas as pd
 import numpy as np
@@ -12,15 +17,35 @@ from core.teams import LVBP_TEAMS, LVBP_ABBR, get_team_logo, get_team_name, get_
 
 load_dotenv()
 
-# Inicializar cliente de Supabase
-@cache_ttl(ttl_seconds=3600)
-def init_supabase() -> Client:
-    """Inicializa y retorna el cliente de Supabase"""
+# Cliente de Supabase Singleton y pre-calentado para evitar deadlocks de import en workers
+_supabase_client_instance: Optional[Client] = None
+
+def get_supabase_client() -> Client:
+    """Retorna la instancia singleton del cliente Supabase."""
+    global _supabase_client_instance
+    if _supabase_client_instance is not None:
+        return _supabase_client_instance
     url = os.environ.get("SUPABASE_URL")
     key = os.environ.get("SUPABASE_KEY")
     if not url or not key:
         raise ValueError("SUPABASE_URL y SUPABASE_KEY deben estar definidos en las variables de entorno o archivo .env")
-    return create_client(url, key)
+    _supabase_client_instance = create_client(url, key)
+    return _supabase_client_instance
+
+@cache_ttl(ttl_seconds=3600)
+def init_supabase() -> Client:
+    """Inicializa y retorna el cliente de Supabase (Singleton seguro)"""
+    return get_supabase_client()
+
+# Pre-calentamiento eager en la carga del modulo si las variables estan definidas
+try:
+    _env_url = os.environ.get("SUPABASE_URL")
+    _env_key = os.environ.get("SUPABASE_KEY")
+    if _env_url and _env_key:
+        get_supabase_client()
+except Exception:
+    pass
+
 
 def get_current_season():
     """Retorna la temporada actual basada en la fecha (Oct-Dic: año actual, Ene-Sep: año anterior)"""
