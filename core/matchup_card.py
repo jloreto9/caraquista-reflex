@@ -15,11 +15,18 @@ from PIL import Image, ImageDraw, ImageFont
 
 
 def _load_font(size: int, bold: bool = False) -> ImageFont.ImageFont:
-    """Carga fuentes multiplataforma con fallback seguro."""
+    """Carga fuentes multiplataforma con soporte Unicode completo para acentos y caracteres especiales."""
     suffix = "-Bold" if bold else ""
+    here = os.path.dirname(os.path.abspath(__file__))
+    repo_root = os.path.dirname(here)
     paths = [
+        # 1. Fuentes TrueType empaquetadas en el repositorio (garantía total multiplataforma)
+        os.path.join(repo_root, "assets", "fonts", f"DejaVuSans{suffix}.ttf"),
+        os.path.join(here, "fonts", f"DejaVuSans{suffix}.ttf"),
+        # 2. Fuentes estándar del sistema Linux
         f"/usr/share/fonts/truetype/dejavu/DejaVuSans{suffix}.ttf",
         f"/usr/share/fonts/truetype/liberation/LiberationSans{'-Bold' if bold else '-Regular'}.ttf",
+        # 3. Fuentes del sistema Windows
         f"C:/Windows/Fonts/{'arialbd' if bold else 'arial'}.ttf",
         f"C:/Windows/Fonts/{'segoeuib' if bold else 'segoeui'}.ttf",
     ]
@@ -109,6 +116,7 @@ def build_matchup_image(
     h2h_rows: List[Dict[str, Any]],
     is_batter: bool = True,
     season: int = 2025,
+    phase: str = "Temporada Regular",
 ) -> bytes:
     """Genera una tarjeta PNG descargable de alta definición con diseño Dark Navy Glass y créditos oficiales."""
     name1 = player_1.get("name", "Jugador 1")
@@ -192,7 +200,7 @@ def build_matchup_image(
     # Center Branding & Temporada
     _tc(COL1 + COL2 // 2, 28, "REPÚBLICA CARAQUISTA", f_large, GOLD_CLR)
     _tc(COL1 + COL2 // 2, 50, "MATCHUP 360 · LVBP", fb, WHITE)
-    _tc(COL1 + COL2 // 2, 72, f"Temporada {season}-{season+1}", fs, GRAY_TEXT)
+    _tc(COL1 + COL2 // 2, 72, f"{season}-{season+1} · {phase}", fs, GRAY_TEXT)
 
     init2 = "".join([part[0] for part in name2.split()[:2]]).upper() or "P2"
     hs2 = _fetch_circular_image(headshot2, size=(64, 64), border_color=BLUE_CLR, initials=init2)

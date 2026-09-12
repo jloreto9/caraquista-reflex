@@ -1031,7 +1031,7 @@ def comparator_tab_view() -> rx.Component:
 def individuales_content() -> rx.Component:
     """Cuerpo de la vista /individuales con pestañas de navegación."""
     return rx.vstack(
-        # Selector de Pestañas
+        # Selector de Pestañas y Fase
         rx.hstack(
             rx.button(
                 rx.hstack(rx.icon("flame", size=16), rx.text("🏏 Bateo"), align="center", spacing="2"),
@@ -1053,7 +1053,28 @@ def individuales_content() -> rx.Component:
                 on_click=IndividualesState.set_active_tab("comparador"),
                 style=rx.cond(IndividualesState.active_tab == "comparador", BUTTON_PRIMARY_STYLE, BUTTON_SECONDARY_STYLE),
             ),
+            rx.spacer(),
+            rx.hstack(
+                rx.icon("calendar", size=16, color=ACCENT_GOLD),
+                rx.text("Fase:", size="2", font_weight="700", color=TEXT_PRIMARY),
+                rx.select(
+                    IndividualesState.phase_options,
+                    value=IndividualesState.selected_phase,
+                    on_change=IndividualesState.set_selected_phase,
+                    size="2",
+                    variant="surface",
+                    color_scheme="amber",
+                ),
+                align="center",
+                spacing="2",
+                background="rgba(13, 21, 43, 0.8)",
+                padding_x="0.75rem",
+                padding_y="0.35rem",
+                border_radius="8px",
+                border=f"1px solid {BORDER_GOLD}",
+            ),
             spacing="3",
+            align="center",
             wrap="wrap",
             width="100%",
             padding_y="0.5rem",

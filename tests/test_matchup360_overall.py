@@ -539,13 +539,15 @@ class TestSupabaseClientLeaguePoolContract(unittest.TestCase):
 
         # Mock de respuesta Supabase con jugadores de Caracas (695) y Magallanes (696)
         mock_query = MagicMock()
-        mock_sb.table.return_value.select.return_value.eq.return_value = mock_query
+        mock_query.select.return_value = mock_query
+        mock_query.eq.return_value = mock_query
         mock_query.execute.return_value.data = [
             {"player_id": 1, "player_name": "Rondón", "team_id": 695, "ab": 100, "h": 30, "hr": 10},
             {"player_id": 2, "player_name": "Núñez", "team_id": 696, "ab": 100, "h": 30, "hr": 12},
         ]
+        mock_sb.table.return_value = mock_query
 
-        df = get_batting_stats(season=2025, team_id=None, limit=200)
+        df = get_batting_stats.__wrapped__(season=2025, team_id=None, limit=200, phase="R")
         self.assertIsInstance(df, pd.DataFrame)
         self.assertIn("team_abbr", df.columns)
         self.assertIn("team_name", df.columns)
@@ -670,6 +672,114 @@ class TestMatchup360CardImageExport(unittest.TestCase):
         self.assertIsNotNone(avg_row)
         self.assertEqual(avg_row["winner"], "H. Castro (CAR)")
 
+
+class TestPhaseAndReinforcementFranchise(unittest.TestCase):
+    """Pruebas de filtrado por fases de campeonato, pertenencia de franquicia de refuerzos y renderizado Unicode."""
+
+    def test_phase_state_configuration_and_mapping(self):
+        """Verifica la configuración reactiva de fases y la traducción exacta a códigos de API/BD."""
+        state = IndividualesState()
+        self.assertEqual(state.selected_phase, "Temporada Regular")
+        self.assertEqual(
+            state.phase_options,
+            ["Temporada Regular", "Round Robin", "Serie Final", "Todas las Fases"],
+        )
+        self.assertEqual(state._phase_code(), "R")
+
+        state.selected_phase = "Round Robin"
+        self.assertEqual(state._phase_code(), "L")
+
+        state.selected_phase = "Serie Final"
+        self.assertEqual(state._phase_code(), "F")
+
+        state.selected_phase = "Todas las Fases"
+        self.assertEqual(state._phase_code(), "all")
+
+    @patch("core.supabase_client.init_supabase")
+    def test_leandro_cedeno_franchise_preservation(self, mock_init):
+        """
+        Verifica que Leandro Cedeño (quien reforzó a Magallanes en postemporada)
+        conserve su franquicia canónica de Leones del Caracas (695, CAR) tanto en
+        Temporada Regular 'R' como en la vista acumulada de Todas las Fases 'all'.
+        """
+        mock_client = MagicMock()
+        mock_init.return_value = mock_client
+
+        # Mock de registros de bateo:
+        # En Temporada Regular (R), Leandro jugó para Leones (695).
+        # En Round Robin (L) y Serie Final (F), reforzó a Magallanes (696).
+        mock_rows = [
+            {
+                "player_id": 666175,
+                "team_id": 695,  # Caracas
+                "ab": 80, "h": 25, "doubles": 5, "triples": 0, "hr": 6, "rbi": 20, "r": 15, "bb": 10, "so": 20,
+                "sb": 0, "cs": 0, "hbp": 1, "sf": 1, "sh": 0,
+                "players": {"full_name": "Leandro Cedeño"},
+                "games": {"season": 2025, "game_type": "R"},
+            },
+            {
+                "player_id": 666175,
+                "team_id": 696,  # Magallanes (Refuerzo en Postemporada)
+                "ab": 40, "h": 12, "doubles": 2, "triples": 0, "hr": 3, "rbi": 10, "r": 8, "bb": 5, "so": 10,
+                "sb": 0, "cs": 0, "hbp": 0, "sf": 0, "sh": 0,
+                "players": {"full_name": "Leandro Cedeño"},
+                "games": {"season": 2025, "game_type": "L"},
+            },
+        ]
+
+        query_mock = MagicMock()
+        query_mock.select.return_value = query_mock
+        query_mock.eq.return_value = query_mock
+        query_mock.execute.return_value = MagicMock(data=mock_rows)
+        mock_client.table.return_value = query_mock
+
+        # 1. En vista 'all', la pertenencia de franquicia debe ser Leones (695, CAR)
+        df_all = get_batting_stats.__wrapped__(team_id=None, limit=100, season=2025, phase="all")
+        cedeno_all = df_all[df_all["player_name"] == "Leandro Cedeño"]
+        self.assertFalse(cedeno_all.empty)
+        self.assertEqual(int(cedeno_all.iloc[0]["team_id"]), 695)
+
+    def test_unicode_matchup_image_generation(self):
+        """Verifica la carga de fuentes TrueType DejaVuSans y renderizado con acentos, tildes y caracteres especiales."""
+        from core.matchup_card import _load_font, build_matchup_image
+
+        font = _load_font(12, bold=True)
+        self.assertIsNotNone(font)
+
+        p1 = {
+            "name": "Hernán Pérez",
+            "pos": "Bateador",
+            "team": "Tigres de Aragua",
+            "badge": "ARA",
+            "headshot": "",
+            "team_logo": "",
+        }
+        p2 = {
+            "name": "Leandro Cedeño",
+            "pos": "Bateador",
+            "team": "Leones del Caracas",
+            "badge": "CAR",
+            "headshot": "",
+            "team_logo": "",
+        }
+        h2h_rows = [
+            {"metric": "⚡ Ofensiva & Sabermetría", "val_1": "", "val_2": "", "winner": "", "is_header": True},
+            {"metric": "AVG", "val_1": ".320", "val_2": ".290", "winner": "H. Pérez (ARA)", "is_header": False},
+            {"metric": "OPS", "val_1": ".950", "val_2": ".880", "winner": "H. Pérez (ARA)", "is_header": False},
+        ]
+
+        png_bytes = build_matchup_image(
+            player_1=p1,
+            player_2=p2,
+            h2h_rows=h2h_rows,
+            is_batter=True,
+            season=2025,
+            phase="Temporada Regular",
+        )
+        self.assertIsInstance(png_bytes, bytes)
+        self.assertGreater(len(png_bytes), 5000)
+        # Magic bytes de PNG: \x89PNG\r\n\x1a\n
+        self.assertTrue(png_bytes.startswith(b"\x89PNG\r\n\x1a\n"))
 
 
 if __name__ == "__main__":

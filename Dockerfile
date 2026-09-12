@@ -39,6 +39,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     caddy \
     curl \
     ca-certificates \
+    fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy installed Python environment from builder

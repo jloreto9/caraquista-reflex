@@ -81,8 +81,15 @@ def _shorten_name(name: str) -> str:
 class IndividualesState(AppState):
     """Estado reactivo para estadísticas individuales y comparador sabermétrico."""
 
-    # ── Pestaña Activa ──────────────────────────────────────────────────────────
+    # ── Pestaña y Fase Activa ───────────────────────────────────────────────────
     active_tab: str = "bateo"  # "bateo", "pitcheo", "fildeo", "comparador"
+    selected_phase: str = "Temporada Regular"
+    phase_options: List[str] = [
+        "Temporada Regular",
+        "Round Robin",
+        "Serie Final",
+        "Todas las Fases",
+    ]
 
     # ── Filtros de Equipo ───────────────────────────────────────────────────────
     selected_batting_team: str = "Toda la LVBP (Overall)"
@@ -185,13 +192,36 @@ class IndividualesState(AppState):
         finally:
             self.is_loading = False
 
+    def _phase_code(self) -> str:
+        """Mapea el nombre de la fase en español al código de la BD/API."""
+        mapping = {
+            "Temporada Regular": "R",
+            "Round Robin": "L",
+            "Serie Final": "F",
+            "Todas las Fases": "all",
+        }
+        return mapping.get(self.selected_phase, "R")
+
+    def set_selected_phase(self, phase: str):
+        """Cambia la fase seleccionada y recarga las estadísticas individuales."""
+        self.selected_phase = phase
+        self.load_all_stats()
+        if self.selected_player_1 and self.selected_player_2:
+            self.update_h2h_comparison()
+
+    def load_season_data(self):
+        """Sobrescribe la recarga por temporada para refrescar estadísticas individuales."""
+        super().load_season_data()
+        self.load_all_stats()
+
     # ── Carga y Cálculo de Estadísticas ─────────────────────────────────────────
     def load_all_stats(self):
         """Descarga datos de Supabase y calcula métricas sabermétricas avanzadas para toda la LVBP."""
         season = self.selected_season
+        phase = self._phase_code()
 
         # ── 1. BATEO (Toda la LVBP) ─────────────────────────────────────────────
-        df_bat = get_batting_stats(team_id=None, limit=600, season=season)
+        df_bat = get_batting_stats(team_id=None, limit=600, season=season, phase=phase)
         if df_bat is not None and not df_bat.empty:
             bat_list = []
             for _, row in df_bat.iterrows():
@@ -296,7 +326,7 @@ class IndividualesState(AppState):
             self.available_batters = []
 
         # ── 2. PITCHEO (Toda la LVBP) ───────────────────────────────────────────
-        df_pit = get_pitching_stats(team_id=None, limit=600, season=season)
+        df_pit = get_pitching_stats(team_id=None, limit=600, season=season, phase=phase)
         if df_pit is not None and not df_pit.empty:
             pit_list = []
             for _, row in df_pit.iterrows():
@@ -379,7 +409,7 @@ class IndividualesState(AppState):
             self.available_pitchers = []
 
         # ── 3. FILDEO / DEFENSA (Toda la LVBP) ──────────────────────────────────
-        df_fld = get_individual_fielding_stats(season=season, team_id=None)
+        df_fld = get_individual_fielding_stats(season=season, team_id=None, phase=phase)
         if df_fld is not None and not df_fld.empty:
             fld_list = []
             for _, row in df_fld.iterrows():
@@ -444,9 +474,9 @@ class IndividualesState(AppState):
         if self.compare_type == "Bateadores" and self.available_batters:
             car_batters = [b for b in self.available_batters if "(CAR)" in b]
             rival_batters = [b for b in self.available_batters if "(CAR)" not in b]
-            if not self.selected_player_1:
+            if not self.selected_player_1 or self.selected_player_1 not in self.available_batters:
                 self.selected_player_1 = car_batters[0] if car_batters else self.available_batters[0]
-            if not self.selected_player_2:
+            if not self.selected_player_2 or self.selected_player_2 not in self.available_batters:
                 if rival_batters:
                     self.selected_player_2 = rival_batters[0]
                 elif len(self.available_batters) > 1:
@@ -456,9 +486,9 @@ class IndividualesState(AppState):
         elif self.compare_type != "Bateadores" and self.available_pitchers:
             car_pitchers = [p for p in self.available_pitchers if "(CAR)" in p]
             rival_pitchers = [p for p in self.available_pitchers if "(CAR)" not in p]
-            if not self.selected_player_1:
+            if not self.selected_player_1 or self.selected_player_1 not in self.available_pitchers:
                 self.selected_player_1 = car_pitchers[0] if car_pitchers else self.available_pitchers[0]
-            if not self.selected_player_2:
+            if not self.selected_player_2 or self.selected_player_2 not in self.available_pitchers:
                 if rival_pitchers:
                     self.selected_player_2 = rival_pitchers[0]
                 elif len(self.available_pitchers) > 1:
@@ -683,10 +713,12 @@ class IndividualesState(AppState):
                 h2h_rows=self.h2h_rows,
                 is_batter=is_batter,
                 season=season,
+                phase=self.selected_phase,
             )
             safe1 = "".join(c for c in str(self.selected_player_1) if c.isalnum() or c in (" ", "_")).strip().replace(" ", "_") or "Jugador1"
             safe2 = "".join(c for c in str(self.selected_player_2) if c.isalnum() or c in (" ", "_")).strip().replace(" ", "_") or "Jugador2"
-            filename = f"LVBP360_Matchup_{safe1}_vs_{safe2}_{season}.png"
+            safe_phase = "".join(c for c in str(self.selected_phase) if c.isalnum() or c in (" ", "_")).strip().replace(" ", "_")
+            filename = f"LVBP360_Matchup_{safe1}_vs_{safe2}_{season}_{safe_phase}.png"
             return rx.download(data=png_bytes, filename=filename, mime_type="image/png")
         finally:
             self.is_generating_card = False
