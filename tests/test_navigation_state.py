@@ -155,7 +155,7 @@ class TestNavigationRoutes(unittest.TestCase):
     """Valida que las 8 rutas requeridas estén presentes con etiquetas en español."""
 
     def test_eight_routes_inventory(self):
-        self.assertEqual(len(NAV_ITEMS), 8, f"Se esperaban exactamente 8 rutas SPA, se encontraron {len(NAV_ITEMS)}")
+        self.assertEqual(len(NAV_ITEMS), 9, f"Se esperaban 9 rutas SPA, se encontraron {len(NAV_ITEMS)}")
         
         expected_routes = [
             "/",
@@ -166,6 +166,7 @@ class TestNavigationRoutes(unittest.TestCase):
             "/situacional",
             "/spray-charts",
             "/bullpen",
+            "/pitching",
         ]
         actual_routes = [item["route"] for item in NAV_ITEMS]
         self.assertEqual(actual_routes, expected_routes)

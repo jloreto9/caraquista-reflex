@@ -29,7 +29,18 @@ from republicaraquistapp.components.layout import layout
 def reliever_table_row(r: Dict[str, Any]) -> rx.Component:
     """Fila para la tabla de efectividad de relevistas."""
     return rx.table.row(
-        rx.table.cell(rx.text(r["pitcher"], size="2", font_weight="700", color=TEXT_PRIMARY)),
+        rx.table.cell(
+            rx.hstack(
+                rx.text(r["pitcher"], size="2", font_weight="700", color=TEXT_PRIMARY),
+                rx.link(
+                    rx.icon("flame", size=13, color=ACCENT_GOLD),
+                    href=f"/pitching?pitcher_name={r['pitcher']}",
+                    title="Ver Pitching Summary",
+                ),
+                align="center",
+                spacing="2",
+            )
+        ),
         rx.table.cell(rx.text(r["appearances"], size="2", color=TEXT_MUTED)),
         rx.table.cell(rx.text(r["ir"], size="2", color="#3b82f6", font_weight="600")),
         rx.table.cell(rx.text(r["irs"], size="2", color="#ef4444", font_weight="600")),

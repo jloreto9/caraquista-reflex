@@ -118,6 +118,11 @@ def pitching_row(p: Dict[str, Any]) -> rx.Component:
                     rx.hstack(
                         rx.text(p["player_name"], size="2", font_weight="700", color=TEXT_PRIMARY),
                         rx.badge(p["team_abbr"], color_scheme="amber", variant="soft", size="1"),
+                        rx.link(
+                            rx.icon("flame", size=14, color=ACCENT_GOLD),
+                            href=f"/pitching?pitcher_id={p['player_id']}",
+                            title="Ver Pitching Summary",
+                        ),
                         spacing="1",
                         align="center",
                     ),

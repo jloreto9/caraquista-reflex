@@ -194,7 +194,8 @@ class TestAll8RoutesRegistration(unittest.TestCase):
             "wpa",
             "situacional",
             "spray-charts",
-            "bullpen"
+            "bullpen",
+            "pitching"
         ]
 
         for r_key in expected_keys:
@@ -204,7 +205,7 @@ class TestAll8RoutesRegistration(unittest.TestCase):
                 f"La ruta '{r_key}' debe estar registrada en republicaraquistapp.py"
             )
 
-        self.assertEqual(len(registered_routes), 8, "Deben existir exactamente 8 rutas SPA registradas.")
+        self.assertEqual(len(registered_routes), 9, "Deben existir exactamente 9 rutas SPA registradas.")
 
 
 if __name__ == '__main__':

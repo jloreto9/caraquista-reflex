@@ -19,6 +19,7 @@ from republicaraquistapp.state.wpa_state import WpaState
 from republicaraquistapp.state.situacional_state import SituationalState
 from republicaraquistapp.state.spray_state import SprayState
 from republicaraquistapp.state.bullpen_state import BullpenState
+from republicaraquistapp.state.pitching_state import PitchingState
 
 # Páginas SPA
 from republicaraquistapp.pages.index import index
@@ -29,6 +30,7 @@ from republicaraquistapp.pages.wpa import wpa
 from republicaraquistapp.pages.situacional import situacional
 from republicaraquistapp.pages.spray_charts import spray_charts
 from republicaraquistapp.pages.bullpen import bullpen
+from republicaraquistapp.pages.pitching import pitching
 
 # Instancia Global de la Aplicación Reflex
 app = rx.App(
@@ -108,6 +110,15 @@ app.add_page(
     title="Bullpen & Tracker de Alineaciones • República Caraquista",
     image="/logo.png",
     on_load=BullpenState.on_load_bullpen
+)
+
+# ── 9. Ruta /pitching (Pitching Summary & Statcast) ──────────────────────────
+app.add_page(
+    pitching,
+    route="/pitching",
+    title="Pitching Summary & Telemetría • República Caraquista",
+    image="/logo.png",
+    on_load=PitchingState.on_load
 )
 
 # ── Endpoint de Healthcheck /ping ──────────────────────────────────────────

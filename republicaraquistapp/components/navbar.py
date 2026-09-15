@@ -82,6 +82,12 @@ NAV_ITEMS: List[Dict[str, str]] = [
         "icon": "shield",
         "desc": "Relevo IR/IRS% y Órdenes 1-9",
     },
+    {
+        "route": "/pitching",
+        "label": "Pitching Summary",
+        "icon": "flame",
+        "desc": "Telemetría Statcast y Labor LVBP",
+    },
 ]
 
 
