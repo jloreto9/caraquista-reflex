@@ -69,6 +69,16 @@ def landing_search_view() -> rx.Component:
                 text_align="center",
                 max_width="600px",
             ),
+            rx.hstack(
+                rx.text("Marco metodológico inspirado en el trabajo de", size="2", color=TEXT_DIM),
+                rx.link(
+                    rx.text("Thomas Nestico (@TJStats)", size="2", font_weight="700", color=ACCENT_GOLD),
+                    href="https://github.com/tnestico/pitching_summary",
+                    is_external=True,
+                ),
+                align="center",
+                spacing="1",
+            ),
             # Caja de búsqueda principal
             rx.box(
                 rx.hstack(
@@ -303,6 +313,7 @@ def pitcher_header_banner() -> rx.Component:
                             rx.badge("LVBP • LEONES DEL CARACAS", style=GOLD_BADGE_STYLE),
                             rx.badge("STATCAST HAWK-EYE", color_scheme="blue"),
                         ),
+                        rx.badge("Inspirado en @TJStats", variant="surface", color_scheme="gray", size="1"),
                         align="center",
                         spacing="2",
                     ),

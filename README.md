@@ -31,9 +31,9 @@ La aplicación supera las limitaciones estéticas y de estado de plataformas mon
 
 ---
 
-## 🚀 Suite Completa de 8 Vistas SPA
+## 🚀 Suite Completa de 9 Vistas SPA
 
-La plataforma cuenta con 8 módulos analíticos independientes y especializados:
+La plataforma cuenta con 9 módulos analíticos independientes y especializados:
 
 | Ruta | Vista | Enfoque Sabermétrico Principal |
 | :--- | :--- | :--- |
@@ -45,6 +45,7 @@ La plataforma cuenta con 8 módulos analíticos independientes y especializados:
 | `/situacional` | **Splits Situacionales & LOB Tracker** | Rendimiento en RISP, Clutch con 2 outs, Bases Llenas, Platoon LHP/RHP, Tracker de Dejados en Base (LOB) y matriz BvP. |
 | `/spray-charts` | **Spray Charts & Strike Zone** | Gráficos espaciales en diamante con modelo determinístico de dureza BIS, y mapas de calor 3x3 de disciplina en el plato. |
 | `/bullpen` | **Bullpen & Alineaciones 1-9** | Efectividad de relevistas, control de corredores heredados ($IR$, $IRS$, $IRS\%$), retención de ventajas y matriz de calor de alineaciones. |
+| `/pitching` | **Pitching Summary & Telemetría** | Telemetría Statcast Hawk-Eye (IVB, HB, Spin, Velo, Zone%) para MLB/MiLB, analítica PBP para Leones del Caracas (LVBP) y exportación de tarjeta HD a 300 DPI inspirada en Thomas Nestico (@TJStats). |
 
 ---
 

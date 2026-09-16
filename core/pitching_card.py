@@ -584,7 +584,7 @@ def build_pitching_summary_card(
     f_footer = _load_font(18)
     f_footer_b = _load_font(18, bold=True)
     draw.text((50, 1305), "REPÚBLICA CARAQUISTA • PLATAFORMA ANALÍTICA SABERMÉTRICA • LVBP / MLB", font=f_footer_b, fill=TEXT_MUTED)
-    draw.text((1580, 1305), "Autor: Jorge Leonardo Loreto • @republicaraquista • Datos: MLB Stats API / Savant", font=f_footer, fill=TEXT_DIM)
+    draw.text((1180, 1305), "Diseño inspirado en Thomas Nestico (@TJStats) • @republicaraquista • Jorge Leonardo Loreto • MLB / Savant", font=f_footer, fill=TEXT_DIM)
 
     # Exportar a bytes PNG con metadatos 300 DPI
     buf = io.BytesIO()
