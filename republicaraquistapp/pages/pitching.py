@@ -243,8 +243,8 @@ def controls_bar() -> rx.Component:
             rx.hstack(
                 rx.select(
                     ["2025", "2024", "2023", "2022"],
-                    value=PitchingState.selected_season.to_string(),
-                    on_change=PitchingState.set_selected_season,
+                    value=PitchingState.pitcher_season,
+                    on_change=PitchingState.set_pitcher_season,
                     size="2",
                     color_scheme="amber",
                 ),

@@ -82,8 +82,8 @@ class PitchingState(AppState):
 
     # ── Filtros y Configuración ─────────────────────────────────────────────
     active_branch: str = "mlb"  # "mlb" o "lvbp"
-    selected_season: int = 2024
-    available_seasons: List[int] = [2025, 2024, 2023, 2022]
+    pitcher_season: str = "2024"
+    available_seasons: List[str] = ["2025", "2024", "2023", "2022"]
     game_logs: List[Dict[str, Any]] = []
     game_log_options: List[str] = []
     selected_game_label: str = ""
@@ -181,13 +181,10 @@ class PitchingState(AppState):
         self.active_branch = branch
         self.load_pitcher_games()
 
-    def set_selected_season(self, season_val: str):
+    def set_pitcher_season(self, season_val: str):
         """Cambia la temporada seleccionada y recarga salidas."""
-        try:
-            self.selected_season = int(season_val)
-            self.load_pitcher_games()
-        except (ValueError, TypeError):
-            pass
+        self.pitcher_season = str(season_val)
+        self.load_pitcher_games()
 
     def set_selected_game_by_label(self, label: str):
         """Selecciona un juego según la etiqueta elegida en el selector."""
@@ -219,7 +216,11 @@ class PitchingState(AppState):
         try:
             p_id = self.selected_pitcher.get("id")
             is_lvbp = (self.active_branch == "lvbp")
-            logs = get_pitcher_game_logs(p_id, self.selected_season, is_lvbp=is_lvbp)
+            try:
+                s_int = int(self.pitcher_season)
+            except (ValueError, TypeError):
+                s_int = 2024
+            logs = get_pitcher_game_logs(p_id, s_int, is_lvbp=is_lvbp)
             self.game_logs = logs
 
             opts = [
@@ -471,12 +472,16 @@ class PitchingState(AppState):
         self.is_generating_card = True
         try:
             is_lvbp = (self.active_branch == "lvbp")
+            try:
+                s_int = int(self.pitcher_season)
+            except (ValueError, TypeError):
+                s_int = 2024
             png_bytes = build_pitching_summary_card(
                 pitcher_data=self.selected_pitcher,
                 game_data=self.current_game_summary,
                 pitch_analysis=self.pitch_analysis,
                 is_lvbp=is_lvbp,
-                season=self.selected_season,
+                season=s_int,
             )
             safe_name = "".join(c for c in self.selected_pitcher.get("name", "Pitcher") if c.isalnum() or c == "_").strip()
             date_safe = str(self.current_game_summary.get("date", "game")).replace("-", "")
