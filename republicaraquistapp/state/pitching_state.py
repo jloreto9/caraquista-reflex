@@ -85,6 +85,8 @@ class PitchingState(AppState):
     selected_season: int = 2024
     available_seasons: List[int] = [2025, 2024, 2023, 2022]
     game_logs: List[Dict[str, Any]] = []
+    game_log_options: List[str] = []
+    selected_game_label: str = ""
     selected_game_pk: int = 0
     is_loading_data: bool = False
     is_generating_card: bool = False
@@ -159,6 +161,8 @@ class PitchingState(AppState):
         self.has_pitcher_selected = False
         self.selected_pitcher = {}
         self.game_logs = []
+        self.game_log_options = []
+        self.selected_game_label = ""
         self.selected_game_pk = 0
         self.pitch_analysis = {}
         self.statcast_table = []
@@ -185,6 +189,16 @@ class PitchingState(AppState):
         except (ValueError, TypeError):
             pass
 
+    def set_selected_game_by_label(self, label: str):
+        """Selecciona un juego según la etiqueta elegida en el selector."""
+        self.selected_game_label = label
+        for i, opt in enumerate(self.game_log_options):
+            if opt == label and i < len(self.game_logs):
+                self.selected_game_pk = self.game_logs[i].get("game_pk", 0)
+                self.current_game_summary = self.game_logs[i]
+                self.load_game_data()
+                break
+
     def select_game(self, game_pk_str: str):
         """Selecciona un juego específico y recarga su analítica."""
         try:
@@ -208,13 +222,21 @@ class PitchingState(AppState):
             logs = get_pitcher_game_logs(p_id, self.selected_season, is_lvbp=is_lvbp)
             self.game_logs = logs
 
-            if logs:
-                self.selected_game_pk = logs[0].get("game_pk")
+            opts = [
+                f"{g.get('date', '')} vs {g.get('opponent', '')} ({g.get('ip', 0)} IP, {g.get('so', 0)} K)"
+                for g in logs
+            ]
+            self.game_log_options = opts
+
+            if logs and opts:
+                self.selected_game_pk = logs[0].get("game_pk", 0)
                 self.current_game_summary = logs[0]
+                self.selected_game_label = opts[0]
                 self.load_game_data()
             else:
                 self.selected_game_pk = 0
                 self.current_game_summary = {}
+                self.selected_game_label = ""
                 self.pitch_analysis = {}
                 self.statcast_table = []
                 self.pbp_table = []

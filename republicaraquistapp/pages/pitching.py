@@ -184,7 +184,7 @@ def search_result_item(p: Dict[str, Any]) -> rx.Component:
                 "Ver Resumen",
                 size="1",
                 style=BUTTON_SECONDARY_STYLE,
-                on_click=lambda: PitchingState.select_pitcher_by_id(p["id"]),
+                on_click=PitchingState.select_pitcher_by_id(p["id"]),
             ),
             align="center",
             width="100%",
@@ -199,7 +199,7 @@ def search_result_item(p: Dict[str, Any]) -> rx.Component:
             "_hover": {"background": CARD_HOVER, "border_color": ACCENT_GOLD},
         },
         width="100%",
-        on_click=lambda: PitchingState.select_pitcher_by_id(p["id"]),
+        on_click=PitchingState.select_pitcher_by_id(p["id"]),
     )
 
 
@@ -224,17 +224,17 @@ def controls_bar() -> rx.Component:
                 rx.button(
                     "⚾ MLB / MiLB (Statcast)",
                     size="2",
-                    variant="solid" if PitchingState.active_branch == "mlb" else "outline",
-                    color_scheme="amber" if PitchingState.active_branch == "mlb" else "gray",
-                    on_click=lambda: PitchingState.set_active_branch("mlb"),
+                    variant=rx.cond(PitchingState.active_branch == "mlb", "solid", "outline"),
+                    color_scheme=rx.cond(PitchingState.active_branch == "mlb", "amber", "gray"),
+                    on_click=PitchingState.set_active_branch("mlb"),
                 ),
                 rx.button(
                     "🦁 Leones del Caracas (LVBP)",
                     size="2",
-                    variant="solid" if PitchingState.active_branch == "lvbp" else "outline",
-                    color_scheme="amber" if PitchingState.active_branch == "lvbp" else "gray",
+                    variant=rx.cond(PitchingState.active_branch == "lvbp", "solid", "outline"),
+                    color_scheme=rx.cond(PitchingState.active_branch == "lvbp", "amber", "gray"),
                     disabled=~PitchingState.has_caracas_history,
-                    on_click=lambda: PitchingState.set_active_branch("lvbp"),
+                    on_click=PitchingState.set_active_branch("lvbp"),
                 ),
                 spacing="2",
             ),
@@ -249,14 +249,10 @@ def controls_bar() -> rx.Component:
                     color_scheme="amber",
                 ),
                 rx.select(
-                    PitchingState.game_logs.map(
-                        lambda g: f"{g['date']} vs {g['opponent']} ({g['ip']} IP, {g['so']} K)"
-                    ),
+                    PitchingState.game_log_options,
+                    value=PitchingState.selected_game_label,
                     placeholder="Seleccionar Salida",
-                    on_change=lambda val: PitchingState.select_game(
-                        # El valor se resuelve por índice o fecha
-                        PitchingState.game_logs[0]["game_pk"].to_string()
-                    ),
+                    on_change=PitchingState.set_selected_game_by_label,
                     size="2",
                     color_scheme="amber",
                     max_width="300px",
