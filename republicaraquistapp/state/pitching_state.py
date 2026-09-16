@@ -11,6 +11,7 @@ Gestiona:
 5. Descarga de tarjeta gráfica en PNG de alta resolución (2400x1350 px a 300 DPI).
 """
 
+import base64
 from typing import List, Dict, Any, Optional
 import reflex as rx
 import pandas as pd
@@ -20,8 +21,16 @@ from core.pitching_engine import (
     search_pitchers,
     get_pitcher_game_logs,
     get_game_pitch_data,
+    get_statcast_pitcher_df,
+    get_pitcher_bio_data,
 )
-from core.pitching_card import build_pitching_summary_card, PITCH_COLORS, _get_pitch_color
+from core.pitching_card import (
+    build_pitching_summary_card,
+    build_nestico_pitching_summary,
+    build_lvbp_matplotlib_summary,
+    PITCH_COLORS,
+    _get_pitch_color,
+)
 from republicaraquistapp.state.base_state import AppState
 from republicaraquistapp.styles.theme import (
     BG_DARK,
@@ -90,6 +99,13 @@ class PitchingState(AppState):
     selected_game_pk: int = 0
     is_loading_data: bool = False
     is_generating_card: bool = False
+
+    # ── Modos Temporales y Tarjeta Matplotlib ──────────────────────────────
+    time_mode: str = "game"  # "game", "season", "range"
+    range_start_date: str = "2024-04-01"
+    range_end_date: str = "2024-06-30"
+    rendered_image_url: str = ""
+    raw_card_bytes: bytes = b""
 
     # ── Datos Procesados del Juego ──────────────────────────────────────────
     pitch_analysis: Dict[str, Any] = {}
@@ -171,8 +187,11 @@ class PitchingState(AppState):
         self.current_game_summary = {}
         self.search_query = ""
         self.search_results = []
+        self.rendered_image_url = ""
+        self.raw_card_bytes = b""
+        self.time_mode = "game"
 
-    # ── Manejadores de Salidas y Ramas ──────────────────────────────────────
+    # ── Manejadores de Salidas, Ramas y Modos Temporales ────────────────────
 
     def set_active_branch(self, branch: str):
         """Cambia entre la rama MLB/MiLB (Statcast) y Leones del Caracas (LVBP)."""
@@ -184,7 +203,25 @@ class PitchingState(AppState):
     def set_pitcher_season(self, season_val: str):
         """Cambia la temporada seleccionada y recarga salidas."""
         self.pitcher_season = str(season_val)
+        self.range_start_date = f"{self.pitcher_season}-04-01"
+        self.range_end_date = f"{self.pitcher_season}-06-30"
         self.load_pitcher_games()
+
+    def set_time_mode(self, mode: str):
+        """Cambia el modo temporal: 'game' (Salida), 'season' (Temporada) o 'range' (Rango)."""
+        self.time_mode = mode
+        if mode == "game" and self.selected_game_pk:
+            self.load_game_data()
+        else:
+            self.generate_card()
+
+    def set_range_start_date(self, val: str):
+        """Actualiza la fecha de inicio para el modo rango."""
+        self.range_start_date = val
+
+    def set_range_end_date(self, val: str):
+        """Actualiza la fecha de fin para el modo rango."""
+        self.range_end_date = val
 
     def set_selected_game_by_label(self, label: str):
         """Selecciona un juego según la etiqueta elegida en el selector."""
@@ -243,6 +280,7 @@ class PitchingState(AppState):
                 self.pbp_table = []
                 self.pbp_kpis = {}
                 self._reset_figures()
+                self.generate_card()
         finally:
             self.is_loading_data = False
 
@@ -278,6 +316,7 @@ class PitchingState(AppState):
             self.fig_splits = self._build_splits_figure(analysis.get("splits_platoon", {}))
         finally:
             self.is_loading_data = False
+            self.generate_card()
 
     # ── Constructores de Figuras Plotly ─────────────────────────────────────
 
@@ -462,35 +501,93 @@ class PitchingState(AppState):
         fig.update_layout(layout)
         return fig
 
-    # ── Descarga de Tarjeta HD en PNG ────────────────────────────────────────
+    # ── Generación y Descarga de Tarjeta HD en Matplotlib ────────────────────
 
-    def download_pitching_card(self):
-        """Genera y descarga la tarjeta gráfica panorámica oficial (2400x1350 px a 300 DPI)."""
-        if not self.selected_pitcher or not self.current_game_summary:
+    def generate_card(self):
+        """Genera la tarjeta Matplotlib de Pitching Summary en memoria."""
+        if not self.selected_pitcher:
             return
 
         self.is_generating_card = True
         try:
-            is_lvbp = (self.active_branch == "lvbp")
+            p_id = self.selected_pitcher.get("id")
             try:
                 s_int = int(self.pitcher_season)
             except (ValueError, TypeError):
                 s_int = 2024
-            png_bytes = build_pitching_summary_card(
-                pitcher_data=self.selected_pitcher,
-                game_data=self.current_game_summary,
-                pitch_analysis=self.pitch_analysis,
-                is_lvbp=is_lvbp,
-                season=s_int,
-            )
-            safe_name = "".join(c for c in self.selected_pitcher.get("name", "Pitcher") if c.isalnum() or c == "_").strip()
-            date_safe = str(self.current_game_summary.get("date", "game")).replace("-", "")
-            league_tag = "LVBP" if is_lvbp else "MLB"
-            filename = f"PitchingSummary_{safe_name}_{league_tag}_{date_safe}.png"
 
-            return rx.download(data=png_bytes, filename=filename, mime_type="image/png")
+            is_lvbp = (self.active_branch == "lvbp")
+
+            if is_lvbp:
+                raw_bytes = build_lvbp_matplotlib_summary(
+                    pitcher_info=self.selected_pitcher,
+                    game_summary=self.current_game_summary,
+                    analysis=self.pitch_analysis,
+                    season=s_int,
+                    dpi=160,
+                )
+            else:
+                pitcher_info = dict(self.selected_pitcher)
+                if not pitcher_info.get("age") or not pitcher_info.get("height"):
+                    try:
+                        bio = get_pitcher_bio_data(p_id)
+                        pitcher_info.update(bio)
+                        self.selected_pitcher = pitcher_info
+                    except Exception:
+                        pass
+
+                game_date = self.current_game_summary.get("date")
+                df_sc = get_statcast_pitcher_df(
+                    pitcher_id=p_id,
+                    season=s_int,
+                    mode=self.time_mode,
+                    game_pk=self.selected_game_pk if self.time_mode == "game" else None,
+                    game_date=game_date if self.time_mode == "game" else None,
+                    start_date=self.range_start_date if self.time_mode == "range" else None,
+                    end_date=self.range_end_date if self.time_mode == "range" else None,
+                )
+
+                raw_bytes = build_nestico_pitching_summary(
+                    df=df_sc,
+                    pitcher_info=pitcher_info,
+                    mode=self.time_mode,
+                    season=s_int,
+                    start_date=self.range_start_date,
+                    end_date=self.range_end_date,
+                    game_summary=self.current_game_summary,
+                    dpi=160,
+                )
+
+            self.raw_card_bytes = raw_bytes
+            b64 = base64.b64encode(raw_bytes).decode("utf-8")
+            self.rendered_image_url = f"data:image/png;base64,{b64}"
         finally:
             self.is_generating_card = False
+
+    def download_pitching_card(self):
+        """Descarga la tarjeta gráfica oficial en PNG de alta resolución."""
+        if not self.selected_pitcher:
+            return
+        if not self.raw_card_bytes:
+            self.generate_card()
+        if not self.raw_card_bytes:
+            return
+
+        safe_name = "".join(c for c in self.selected_pitcher.get("name", "Pitcher") if c.isalnum() or c == "_").strip()
+        is_lvbp = (self.active_branch == "lvbp")
+        league_tag = "LVBP" if is_lvbp else "MLB"
+
+        if is_lvbp or self.time_mode == "game":
+            date_safe = str(self.current_game_summary.get("date", "game")).replace("-", "")
+            filename = f"PitchingSummary_{safe_name}_{league_tag}_{date_safe}.png"
+        elif self.time_mode == "season":
+            filename = f"PitchingSummary_{safe_name}_{league_tag}_Temporada_{self.pitcher_season}.png"
+        else:
+            s_safe = str(self.range_start_date).replace("-", "")
+            e_safe = str(self.range_end_date).replace("-", "")
+            filename = f"PitchingSummary_{safe_name}_{league_tag}_Rango_{s_safe}_{e_safe}.png"
+
+        return rx.download(data=self.raw_card_bytes, filename=filename, mime_type="image/png")
 
     # ── Lifecycle on_load ───────────────────────────────────────────────────
 

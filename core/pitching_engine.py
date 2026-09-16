@@ -18,6 +18,7 @@ import json
 import time
 import urllib.parse
 import urllib.request
+import pandas as pd
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime
 
@@ -32,6 +33,13 @@ CACHE_PBP_DIR = os.path.join(
     "mlb_pbp"
 )
 os.makedirs(CACHE_PBP_DIR, exist_ok=True)
+
+CACHE_STATCAST_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    ".cache",
+    "statcast"
+)
+os.makedirs(CACHE_STATCAST_DIR, exist_ok=True)
 
 HEADERS = {
     "User-Agent": (
@@ -742,3 +750,171 @@ def _build_platoon_splits(pitches: List[Dict[str, Any]]) -> Dict[str, Any]:
         "vs_lhb": _calc_split(lhb),
         "vs_rhb": _calc_split(rhb),
     }
+
+
+# ── 4. Telemetría Completa Statcast & Persistencia Local ──────────────────────
+
+def df_processing(df_pyb: pd.DataFrame) -> pd.DataFrame:
+    """Prepara y calcula las banderas de swing, whiff, zona y transforma unidades a pulgadas."""
+    if df_pyb is None or df_pyb.empty:
+        return pd.DataFrame()
+    df = df_pyb.copy()
+    swing_code = ['foul_bunt', 'foul', 'hit_into_play', 'swinging_strike', 'foul_tip',
+                  'swinging_strike_blocked', 'missed_bunt', 'bunt_foul_tip']
+    whiff_code = ['swinging_strike', 'foul_tip', 'swinging_strike_blocked']
+
+    if 'description' in df.columns:
+        df['swing'] = df['description'].isin(swing_code)
+        df['whiff'] = df['description'].isin(whiff_code)
+    else:
+        df['swing'] = False
+        df['whiff'] = False
+
+    if 'zone' in df.columns:
+        df['in_zone'] = df['zone'] < 10
+        df['out_zone'] = df['zone'] > 10
+        df['chase'] = (~df['in_zone']) & (df['swing'])
+    else:
+        df['in_zone'] = False
+        df['out_zone'] = False
+        df['chase'] = False
+
+    # Convertir quiebres de pies a pulgadas (si vienen en pies < 6 ft)
+    if 'pfx_z' in df.columns and not df['pfx_z'].dropna().empty:
+        if df['pfx_z'].abs().max() < 6:
+            df['pfx_z'] = df['pfx_z'] * 12
+    if 'pfx_x' in df.columns and not df['pfx_x'].dropna().empty:
+        if df['pfx_x'].abs().max() < 6:
+            df['pfx_x'] = df['pfx_x'] * 12
+
+    return df
+
+
+def get_statcast_pitcher_df(
+    pitcher_id: int,
+    season: int = 2024,
+    mode: str = "season",
+    game_pk: Optional[int] = None,
+    game_date: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+) -> pd.DataFrame:
+    """
+    Descarga y consulta lanzamientos Statcast para un lanzador con persistencia local en .parquet.
+    Cero ocupación en Supabase.
+    """
+    import pybaseball as pyb
+
+    season_parquet = os.path.join(CACHE_STATCAST_DIR, f"{pitcher_id}_{season}.parquet")
+    df: Optional[pd.DataFrame] = None
+
+    if os.path.exists(season_parquet):
+        try:
+            df = pd.read_parquet(season_parquet)
+        except Exception:
+            df = None
+
+    if mode == "season":
+        if df is None or df.empty:
+            s_start = f"{season}-03-20"
+            s_end = f"{season}-11-05"
+            try:
+                df = pyb.statcast_pitcher(s_start, s_end, pitcher_id)
+                if df is not None and not df.empty:
+                    df.to_parquet(season_parquet, index=False)
+            except Exception:
+                df = pd.DataFrame()
+        return df_processing(df)
+
+    elif mode == "game":
+        # Filtrar de season_parquet si ya está en disco
+        if df is not None and not df.empty:
+            if game_pk and 'game_pk' in df.columns:
+                df_game = df[df['game_pk'] == int(game_pk)]
+                if not df_game.empty:
+                    return df_processing(df_game)
+            if game_date and 'game_date' in df.columns:
+                df_game = df[df['game_date'].astype(str) == str(game_date)]
+                if not df_game.empty:
+                    return df_processing(df_game)
+
+        # Si no estaba en season_parquet, buscar o crear game_parquet
+        date_str = str(game_date) if game_date else ""
+        game_parquet = os.path.join(CACHE_STATCAST_DIR, f"{pitcher_id}_{date_str}.parquet") if date_str else ""
+        if game_parquet and os.path.exists(game_parquet):
+            try:
+                df_game = pd.read_parquet(game_parquet)
+                return df_processing(df_game)
+            except Exception:
+                pass
+
+        if date_str:
+            try:
+                df_game = pyb.statcast_pitcher(date_str, date_str, pitcher_id)
+                if df_game is not None and not df_game.empty and game_parquet:
+                    df_game.to_parquet(game_parquet, index=False)
+                return df_processing(df_game)
+            except Exception:
+                pass
+        return pd.DataFrame()
+
+    elif mode == "range":
+        s_date = start_date or f"{season}-04-01"
+        e_date = end_date or f"{season}-06-30"
+
+        # Si tenemos season_parquet, filtrar directamente
+        if df is not None and not df.empty and 'game_date' in df.columns:
+            df_range = df[(df['game_date'].astype(str) >= s_date) & (df['game_date'].astype(str) <= e_date)]
+            return df_processing(df_range)
+
+        # Si no, buscar range_parquet
+        range_parquet = os.path.join(CACHE_STATCAST_DIR, f"{pitcher_id}_{s_date}_{e_date}.parquet")
+        if os.path.exists(range_parquet):
+            try:
+                df_range = pd.read_parquet(range_parquet)
+                return df_processing(df_range)
+            except Exception:
+                pass
+
+        try:
+            df_range = pyb.statcast_pitcher(s_date, e_date, pitcher_id)
+            if df_range is not None and not df_range.empty:
+                df_range.to_parquet(range_parquet, index=False)
+            return df_processing(df_range)
+        except Exception:
+            return pd.DataFrame()
+
+    return pd.DataFrame()
+
+
+def get_pitcher_bio_data(pitcher_id: int) -> Dict[str, Any]:
+    """Obtiene biografía completa y equipo actual del lanzador desde MLB Stats API."""
+    url = f"https://statsapi.mlb.com/api/v1/people?personIds={pitcher_id}&hydrate=currentTeam"
+    try:
+        req = urllib.request.Request(url, headers=HEADERS)
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            person = data['people'][0]
+            team_info = person.get('currentTeam', {})
+            return {
+                "name": person.get("fullName", "Pitcher"),
+                "throws": person.get("pitchHand", {}).get("code", "R"),
+                "age": person.get("currentAge", 28),
+                "height": person.get("height", "6' 2\""),
+                "weight": person.get("weight", 200),
+                "team": team_info.get("name", "MLB"),
+                "team_abbr": team_info.get("abbreviation", "MLB"),
+                "team_id": team_info.get("id", 0),
+            }
+    except Exception:
+        return {
+            "name": "Pitcher",
+            "throws": "R",
+            "age": 28,
+            "height": "6' 2\"",
+            "weight": 200,
+            "team": "MLB",
+            "team_abbr": "MLB",
+            "team_id": 0,
+        }
+

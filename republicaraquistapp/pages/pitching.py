@@ -206,76 +206,163 @@ def search_result_item(p: Dict[str, Any]) -> rx.Component:
 # ── 2. Barra Superior y Controles de la Vista Activa ──────────────────────────
 
 def controls_bar() -> rx.Component:
-    """Barra de navegación secundaria con selectores de juego, temporada y bifurcación."""
+    """Barra de navegación secundaria con selectores de juego, temporada, rama y modo temporal."""
     return rx.box(
-        rx.hstack(
-            # Botón Volver
-            rx.button(
-                rx.icon("arrow-left", size=16),
-                "Buscar Otro",
-                size="2",
-                variant="outline",
-                color_scheme="gray",
-                on_click=PitchingState.clear_selection,
-            ),
-            rx.divider(orientation="vertical", size="2"),
-            # Bifurcación: MLB vs LVBP
+        rx.vstack(
+            # Fila 1: Volver, Ramas y Conmutador Temporal
             rx.hstack(
                 rx.button(
-                    "⚾ MLB / MiLB (Statcast)",
+                    rx.icon("arrow-left", size=16),
+                    "Buscar Otro",
                     size="2",
-                    variant=rx.cond(PitchingState.active_branch == "mlb", "solid", "outline"),
-                    color_scheme=rx.cond(PitchingState.active_branch == "mlb", "amber", "gray"),
-                    on_click=PitchingState.set_active_branch("mlb"),
+                    variant="outline",
+                    color_scheme="gray",
+                    on_click=PitchingState.clear_selection,
                 ),
-                rx.button(
-                    "🦁 Leones del Caracas (LVBP)",
-                    size="2",
-                    variant=rx.cond(PitchingState.active_branch == "lvbp", "solid", "outline"),
-                    color_scheme=rx.cond(PitchingState.active_branch == "lvbp", "amber", "gray"),
-                    disabled=~PitchingState.has_caracas_history,
-                    on_click=PitchingState.set_active_branch("lvbp"),
+                rx.divider(orientation="vertical", size="2"),
+                # Ramas
+                rx.hstack(
+                    rx.button(
+                        "⚾ MLB / MiLB (Statcast)",
+                        size="2",
+                        variant=rx.cond(PitchingState.active_branch == "mlb", "solid", "outline"),
+                        color_scheme=rx.cond(PitchingState.active_branch == "mlb", "amber", "gray"),
+                        on_click=PitchingState.set_active_branch("mlb"),
+                    ),
+                    rx.button(
+                        "🦁 Leones del Caracas (LVBP)",
+                        size="2",
+                        variant=rx.cond(PitchingState.active_branch == "lvbp", "solid", "outline"),
+                        color_scheme=rx.cond(PitchingState.active_branch == "lvbp", "amber", "gray"),
+                        disabled=~PitchingState.has_caracas_history,
+                        on_click=PitchingState.set_active_branch("lvbp"),
+                    ),
+                    spacing="2",
                 ),
-                spacing="2",
+                rx.spacer(),
+                # Selector de Modo Temporal (Salida / Temporada / Rango)
+                rx.hstack(
+                    rx.button(
+                        "Salida Individual",
+                        size="2",
+                        variant=rx.cond(PitchingState.time_mode == "game", "solid", "outline"),
+                        color_scheme=rx.cond(PitchingState.time_mode == "game", "amber", "gray"),
+                        on_click=PitchingState.set_time_mode("game"),
+                    ),
+                    rx.button(
+                        "Temporada Completa",
+                        size="2",
+                        variant=rx.cond(PitchingState.time_mode == "season", "solid", "outline"),
+                        color_scheme=rx.cond(PitchingState.time_mode == "season", "amber", "gray"),
+                        disabled=PitchingState.active_branch == "lvbp",
+                        on_click=PitchingState.set_time_mode("season"),
+                    ),
+                    rx.button(
+                        "Rango de Fechas",
+                        size="2",
+                        variant=rx.cond(PitchingState.time_mode == "range", "solid", "outline"),
+                        color_scheme=rx.cond(PitchingState.time_mode == "range", "amber", "gray"),
+                        disabled=PitchingState.active_branch == "lvbp",
+                        on_click=PitchingState.set_time_mode("range"),
+                    ),
+                    spacing="2",
+                ),
+                align="center",
+                width="100%",
+                wrap="wrap",
             ),
-            rx.spacer(),
-            # Selectores de Temporada y Salida
+            rx.divider(size="1", color="rgba(255, 255, 255, 0.08)"),
+            # Fila 2: Filtros contextuales según el modo seleccionado
             rx.hstack(
+                rx.text("Temporada:", size="2", font_weight="700", color=TEXT_MUTED),
                 rx.select(
                     ["2025", "2024", "2023", "2022"],
                     value=PitchingState.pitcher_season,
                     on_change=PitchingState.set_pitcher_season,
                     size="2",
                     color_scheme="amber",
+                    width="100px",
                 ),
-                rx.select(
-                    PitchingState.game_log_options,
-                    value=PitchingState.selected_game_label,
-                    placeholder="Seleccionar Salida",
-                    on_change=PitchingState.set_selected_game_by_label,
-                    size="2",
-                    color_scheme="amber",
-                    max_width="300px",
+                # Modo Salida Individual
+                rx.cond(
+                    PitchingState.time_mode == "game",
+                    rx.hstack(
+                        rx.text("Salida:", size="2", font_weight="700", color=TEXT_MUTED),
+                        rx.select(
+                            PitchingState.game_log_options,
+                            value=PitchingState.selected_game_label,
+                            placeholder="Seleccionar Salida",
+                            on_change=PitchingState.set_selected_game_by_label,
+                            size="2",
+                            color_scheme="amber",
+                            max_width="340px",
+                        ),
+                        align="center",
+                        spacing="2",
+                    ),
                 ),
+                # Modo Rango de Fechas
+                rx.cond(
+                    PitchingState.time_mode == "range",
+                    rx.hstack(
+                        rx.text("Desde:", size="2", font_weight="700", color=TEXT_MUTED),
+                        rx.input(
+                            type="date",
+                            value=PitchingState.range_start_date,
+                            on_change=PitchingState.set_range_start_date,
+                            size="2",
+                            max_width="150px",
+                            color_scheme="amber",
+                        ),
+                        rx.text("Hasta:", size="2", font_weight="700", color=TEXT_MUTED),
+                        rx.input(
+                            type="date",
+                            value=PitchingState.range_end_date,
+                            on_change=PitchingState.set_range_end_date,
+                            size="2",
+                            max_width="150px",
+                            color_scheme="amber",
+                        ),
+                        rx.button(
+                            "Actualizar",
+                            size="2",
+                            style=BUTTON_PRIMARY_STYLE,
+                            loading=PitchingState.is_generating_card,
+                            on_click=PitchingState.generate_card,
+                        ),
+                        align="center",
+                        spacing="2",
+                    ),
+                ),
+                # Modo Temporada Completa
+                rx.cond(
+                    PitchingState.time_mode == "season",
+                    rx.badge(
+                        "Analizando todos los lanzamientos registrados de la temporada",
+                        color_scheme="amber",
+                        size="2",
+                    ),
+                ),
+                rx.spacer(),
                 # Botón de Descarga HD PNG
                 rx.button(
                     rx.icon("download", size=16),
-                    "Descargar Tarjeta HD",
+                    "Descargar Tarjeta HD (PNG)",
                     size="2",
                     style=BUTTON_PRIMARY_STYLE,
                     loading=PitchingState.is_generating_card,
                     on_click=PitchingState.download_pitching_card,
                 ),
-                spacing="3",
                 align="center",
+                width="100%",
+                wrap="wrap",
             ),
-            align="center",
+            spacing="3",
             width="100%",
-            wrap="wrap",
         ),
         style=CARD_STYLE,
         width="100%",
-        padding="0.8rem 1.2rem",
+        padding="1rem 1.4rem",
     )
 
 
@@ -520,7 +607,71 @@ def lvbp_adapted_visual_panel() -> rx.Component:
     )
 
 
-# ── 7. Página Principal /pitching ─────────────────────────────────────────────
+# ── 7. Tarjeta Gráfica Oficial en Matplotlib ──────────────────────────────────
+
+def pitching_summary_image_card() -> rx.Component:
+    """Visualizador principal de la tarjeta Pitching Summary generada con Matplotlib estilo Thomas Nestico."""
+    return rx.box(
+        rx.vstack(
+            rx.hstack(
+                rx.icon("sparkles", size=18, color=ACCENT_GOLD),
+                rx.heading("PITCHING SUMMARY (MATPLOTLIB • METODOLOGÍA THOMAS NESTICO @TJSTATS)", size="3", color=TEXT_PRIMARY),
+                rx.spacer(),
+                rx.button(
+                    rx.icon("download", size=15),
+                    "Descargar PNG",
+                    size="1",
+                    style=BUTTON_PRIMARY_STYLE,
+                    loading=PitchingState.is_generating_card,
+                    on_click=PitchingState.download_pitching_card,
+                ),
+                align="center",
+                width="100%",
+            ),
+            rx.cond(
+                PitchingState.is_generating_card,
+                rx.center(
+                    rx.vstack(
+                        rx.spinner(size="3", color=ACCENT_GOLD),
+                        rx.text("Generando visualización gráfica de alta resolución en Matplotlib...", size="2", color=TEXT_MUTED),
+                        spacing="3",
+                        align="center",
+                    ),
+                    padding_y="4rem",
+                    width="100%",
+                ),
+                rx.cond(
+                    PitchingState.rendered_image_url != "",
+                    rx.center(
+                        rx.image(
+                            src=PitchingState.rendered_image_url,
+                            width="100%",
+                            max_width="1000px",
+                            border_radius="12px",
+                            border=f"1px solid {BORDER_CARD}",
+                            box_shadow="0 15px 50px rgba(0, 0, 0, 0.6)",
+                            alt="Pitching Summary Card",
+                        ),
+                        width="100%",
+                        padding_y="1rem",
+                    ),
+                    rx.center(
+                        rx.text("No se ha generado la imagen para este período.", size="2", color=TEXT_MUTED),
+                        padding_y="3rem",
+                        width="100%",
+                    ),
+                ),
+            ),
+            spacing="3",
+            width="100%",
+        ),
+        style=CARD_STYLE,
+        width="100%",
+        padding="1.2rem",
+    )
+
+
+# ── 8. Página Principal /pitching ─────────────────────────────────────────────
 
 def pitching_content() -> rx.Component:
     """Contenido dinámico que conmuta entre buscador inicial y dashboard del lanzador."""
@@ -529,14 +680,14 @@ def pitching_content() -> rx.Component:
         landing_search_view(),
         rx.vstack(
             controls_bar(),
-            pitcher_header_banner(),
-            # Bifurcación de Tablas
+            pitching_summary_image_card(),
+            # Bifurcación de Tablas Complementarias
             rx.cond(
                 (PitchingState.active_branch == "mlb") & (PitchingState.statcast_table.length() > 0),
                 statcast_repertoire_table(),
                 pbp_outcomes_table(),
             ),
-            # Bifurcación de Gráficos
+            # Bifurcación de Gráficos Interactivos Complementarios
             rx.cond(
                 (PitchingState.active_branch == "mlb") & (PitchingState.statcast_table.length() > 0),
                 mlb_statcast_visual_panel(),

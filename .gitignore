@@ -13,3 +13,5 @@ assets/external/
 TEST_INFRA.md
 TEST_READY.md
 .cache/mlb_pbp/
+.cache/statcast/
+*.parquet
