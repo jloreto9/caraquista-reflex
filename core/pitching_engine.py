@@ -55,18 +55,181 @@ HEADERS = {
 }
 
 
-# ── 1. Búsqueda Universal de Lanzadores ───────────────────────────────────────
+# ── 1. Búsqueda Universal de Lanzadores y Resolución por ID ───────────────────
+
+@cache_ttl(ttl_seconds=7200)
+def _get_caracas_pitcher_ids() -> set:
+    """Obtiene los IDs de lanzadores que han lanzado con Leones del Caracas en Supabase o caché."""
+    caracas_ids = {
+        544150,  # Albert Suárez
+        468504,  # Jhoulys Chacín (MLB Person ID)
+        518586,  # Jhoulys Chacín (Legacy ID)
+        612797,  # Erick Leal
+        660508,  # Norwith Gudiño
+        600965,  # Ricardo Rodríguez
+        642570,  # José Mujica
+        542467,  # Yoimer Camacho
+        622703,  # Ronald Herrera
+        660896,  # Miguel Socolovich
+        672851,  # Alfred Gutiérrez
+        600526,  # José Torres
+        521655,  # Wilmer Font
+        660788,  # Jesus Vargas
+        622415,  # Anthony Vizcaya
+        672578,  # Carlos Hernández
+        506693,  # Henderson Álvarez
+        640470,  # Adbert Alzolay
+        692350,  # Mikell Manzano
+    }
+    # Intentar cargar de archivos locales .cache/lvbp_season_*.json
+    cache_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".cache")
+    if os.path.exists(cache_dir):
+        for f in os.listdir(cache_dir):
+            if f.startswith("lvbp_season_") and f.endswith(".json"):
+                try:
+                    p = os.path.join(cache_dir, f)
+                    with open(p, "r", encoding="utf-8") as fp:
+                        s_data = json.load(fp)
+                        for br in s_data.get("bullpen_records", []):
+                            if br.get("team_id") == 695 and br.get("pitcher_id"):
+                                caracas_ids.add(int(br.get("pitcher_id")))
+                except Exception:
+                    pass
+    return caracas_ids
+
+
+@cache_ttl(ttl_seconds=3600)
+def _get_lvbp_pitcher_metadata(pitcher_id: int) -> Dict[str, Any]:
+    """Consulta si un lanzador tiene registros en la LVBP (todos los 8 equipos) y retorna su equipo."""
+    from core.teams import LVBP_TEAMS, LVBP_ABBR
+    caracas_ids = _get_caracas_pitcher_ids()
+    is_caracas = pitcher_id in caracas_ids
+
+    # 1. Consultar Supabase
+    try:
+        from core.supabase_client import init_supabase
+        sb = init_supabase()
+        res = sb.table('pitching_stats').select('team_id, players(full_name)').eq('player_id', pitcher_id).limit(1).execute()
+        if res.data:
+            tid = int(res.data[0].get('team_id') or 0)
+            p_data = res.data[0].get('players') or {}
+            p_name = p_data.get('full_name', '') if isinstance(p_data, dict) else ''
+            t_name = LVBP_TEAMS.get(tid, "Equipo LVBP")
+            t_abbr = LVBP_ABBR.get(tid, "LVBP")
+            return {
+                "has_lvbp": True,
+                "has_caracas": (tid == 695) or is_caracas,
+                "team_id": tid,
+                "team_name": t_name,
+                "team_abbr": t_abbr,
+                "name": p_name,
+            }
+    except Exception:
+        pass
+
+    # 2. Consultar archivos locales en .cache
+    cache_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".cache")
+    if os.path.exists(cache_dir):
+        for f in os.listdir(cache_dir):
+            if f.startswith("lvbp_season_") and f.endswith(".json"):
+                try:
+                    p = os.path.join(cache_dir, f)
+                    with open(p, "r", encoding="utf-8") as fp:
+                        s_data = json.load(fp)
+                        for br in s_data.get("bullpen_records", []):
+                            if br.get("pitcher_id") == pitcher_id:
+                                tid = int(br.get("team_id") or 0)
+                                return {
+                                    "has_lvbp": True,
+                                    "has_caracas": (tid == 695) or is_caracas,
+                                    "team_id": tid,
+                                    "team_name": LVBP_TEAMS.get(tid, "Equipo LVBP"),
+                                    "team_abbr": LVBP_ABBR.get(tid, "LVBP"),
+                                    "name": br.get("pitcher_name", ""),
+                                }
+                except Exception:
+                    pass
+
+    return {
+        "has_lvbp": is_caracas,
+        "has_caracas": is_caracas,
+        "team_id": 695 if is_caracas else 0,
+        "team_name": "Leones del Caracas" if is_caracas else "Agente Libre",
+        "team_abbr": "CAR" if is_caracas else "MLB",
+        "name": "",
+    }
+
+
+@cache_ttl(ttl_seconds=3600)
+def get_pitcher_by_id(pitcher_id: int) -> Optional[Dict[str, Any]]:
+    """
+    Obtiene el perfil completo de un lanzador por su ID numérico.
+    Resuelve vía MLB Stats API people/{id} y enriquece con metadatos de la LVBP.
+    """
+    if not pitcher_id:
+        return None
+
+    lvbp_info = _get_lvbp_pitcher_metadata(pitcher_id)
+
+    name = lvbp_info.get("name") or ""
+    pos = "P"
+    curr_team = lvbp_info.get("team_name") if lvbp_info.get("has_lvbp") else "Agente Libre"
+    throws = "R"
+    photo_url = f"https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current/w_213,q_auto:best/v1/people/{pitcher_id}/headshot/67/current"
+
+    # Consultar endpoint directo de persona en MLB Stats API
+    url = f"https://statsapi.mlb.com/api/v1/people/{pitcher_id}"
+    try:
+        req = urllib.request.Request(url, headers=HEADERS)
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            people = data.get("people", [])
+            if people:
+                p = people[0]
+                name = p.get("fullName", name)
+                pos = p.get("primaryPosition", {}).get("abbreviation", "P")
+                mlb_team = p.get("currentTeam", {}).get("name")
+                if mlb_team:
+                    curr_team = mlb_team
+                throws = p.get("pitchHand", {}).get("code", "R")
+    except Exception:
+        pass
+
+    if not name:
+        name = f"Lanzador #{pitcher_id}"
+
+    return {
+        "id": pitcher_id,
+        "name": name,
+        "position": pos,
+        "team": curr_team,
+        "throws": throws,
+        "has_lvbp_history": bool(lvbp_info.get("has_lvbp")),
+        "has_caracas_history": bool(lvbp_info.get("has_caracas")),
+        "lvbp_team_id": lvbp_info.get("team_id", 0),
+        "lvbp_team_name": lvbp_info.get("team_name", "LVBP"),
+        "lvbp_team_abbr": lvbp_info.get("team_abbr", "LVBP"),
+        "photo_url": photo_url,
+    }
+
 
 @cache_ttl(ttl_seconds=3600)
 def search_pitchers(query: str) -> List[Dict[str, Any]]:
     """
-    Busca lanzadores por nombre en MLB Stats API y cruza con la reserva
-    histórica de Leones del Caracas y la LVBP.
+    Busca lanzadores por nombre o ID numérico en MLB Stats API y cruza con la reserva
+    de los 8 equipos de la LVBP y Leones del Caracas.
     """
     if not query or len(query.strip()) < 2:
         return []
 
-    q = urllib.parse.quote(query.strip())
+    clean_query = query.strip()
+
+    # Si es una búsqueda por ID numérico (ej: "645307"), resolver directamente
+    if clean_query.isdigit():
+        p_single = get_pitcher_by_id(int(clean_query))
+        return [p_single] if p_single else []
+
+    q = urllib.parse.quote(clean_query)
     url = f"https://statsapi.mlb.com/api/v1/people/search?names={q}&sportIds=1,11,12,13,14,16,17"
 
     results: List[Dict[str, Any]] = []
@@ -78,7 +241,6 @@ def search_pitchers(query: str) -> List[Dict[str, Any]]:
     except Exception:
         people = []
 
-    # Detectar historial en LVBP / Leones del Caracas
     caracas_ids = _get_caracas_pitcher_ids()
 
     for p in people:
@@ -88,7 +250,12 @@ def search_pitchers(query: str) -> List[Dict[str, Any]]:
         curr_team = p.get("currentTeam", {}).get("name", "Agente Libre")
         throws = p.get("pitchHand", {}).get("code", "R")
 
-        has_caracas = p_id in caracas_ids
+        lvbp_info = _get_lvbp_pitcher_metadata(p_id)
+        has_lvbp = bool(lvbp_info.get("has_lvbp"))
+        has_caracas = bool(lvbp_info.get("has_caracas"))
+
+        if has_lvbp and (not curr_team or curr_team == "Agente Libre"):
+            curr_team = lvbp_info.get("team_name", curr_team)
 
         results.append({
             "id": p_id,
@@ -96,45 +263,17 @@ def search_pitchers(query: str) -> List[Dict[str, Any]]:
             "position": pos or "P",
             "team": curr_team,
             "throws": throws,
+            "has_lvbp_history": has_lvbp,
             "has_caracas_history": has_caracas,
+            "lvbp_team_id": lvbp_info.get("team_id", 0),
+            "lvbp_team_name": lvbp_info.get("team_name", "LVBP"),
+            "lvbp_team_abbr": lvbp_info.get("team_abbr", "LVBP"),
             "photo_url": f"https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current/w_213,q_auto:best/v1/people/{p_id}/headshot/67/current",
         })
 
-    # Ordenar: primero los lanzadores, y dentro de ellos los que tengan historial con Caracas
-    results.sort(key=lambda x: (not x["has_caracas_history"], x["position"] != "P", x["name"]))
+    # Ordenar: primero lanzadores con historial LVBP, luego lanzadores en general
+    results.sort(key=lambda x: (not x["has_lvbp_history"], not x["has_caracas_history"], x["position"] != "P", x["name"]))
     return results[:15]
-
-
-@cache_ttl(ttl_seconds=7200)
-def _get_caracas_pitcher_ids() -> set:
-    """Obtiene los IDs de lanzadores que han lanzado con Leones del Caracas en Supabase o caché."""
-    caracas_ids = {
-        544150,  # Albert Suárez
-        518586,  # Jhoulys Chacín
-        612797,  # Erick Leal
-        642545,  # Norwith Gudiño
-        606131,  # Ricardo Rodríguez
-        642570,  # José Mujica
-        660761,  # Yoimer Camacho
-        622663,  # Ronald Herrera
-        660896,  # Miguel Socolovich
-        672851,  # Alfred Gutiérrez
-    }
-    # Intentar cargar de archivos locales .cache/lvbp_season_*.json
-    cache_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".cache")
-    if os.path.exists(cache_dir):
-        for f in os.listdir(cache_dir):
-            if f.startswith("lvbp_season_") and f.endswith(".json"):
-                try:
-                    p = os.path.join(cache_dir, f)
-                    with open(p, "r", encoding="utf-8") as fp:
-                        s_data = json.load(fp)
-                        for pl in s_data.get("pitching_stats", []):
-                            if pl.get("team_id") == 695:
-                                caracas_ids.add(pl.get("player_id"))
-                except Exception:
-                    pass
-    return caracas_ids
 
 
 # ── 2. Obtención de Game Logs (Salidas) ────────────────────────────────────────

@@ -19,6 +19,7 @@ import plotly.graph_objects as go
 
 from core.pitching_engine import (
     search_pitchers,
+    get_pitcher_by_id,
     get_pitcher_game_logs,
     get_game_pitch_data,
     get_statcast_pitcher_df,
@@ -87,12 +88,13 @@ class PitchingState(AppState):
     selected_pitcher: Dict[str, Any] = {}
     has_pitcher_selected: bool = False
     has_caracas_history: bool = False
+    has_lvbp_history: bool = False
 
-    # ── Rama Activa: 'mlb' (Statcast) vs 'lvbp' (PBP Leones del Caracas) ────
-    active_branch: str = "mlb"
+    # ── Rama Activa: 'mlb' (Statcast) vs 'lvbp' (PBP LVBP / Leones del Caracas) ────
+    active_branch: str = "lvbp"
 
     # ── Salidas y Temporada ─────────────────────────────────────────────────
-    pitcher_season: str = "2024"
+    pitcher_season: str = "2025"
     available_seasons: List[str] = ["2025", "2024", "2023", "2022"]
     game_logs: List[Dict[str, Any]] = []
     game_log_options: List[str] = []
@@ -103,8 +105,8 @@ class PitchingState(AppState):
 
     # ── Modos Temporales y Tarjeta Matplotlib ──────────────────────────────
     time_mode: str = "game"  # "game", "season", "range"
-    range_start_date: str = "2024-04-01"
-    range_end_date: str = "2024-06-30"
+    range_start_date: str = "2025-10-01"
+    range_end_date: str = "2026-01-31"
     rendered_image_url: str = ""
     raw_card_bytes: bytes = b""
 
@@ -155,7 +157,7 @@ class PitchingState(AppState):
         finally:
             self.is_searching = False
 
-    def select_pitcher_by_id(self, pitcher_id: int):
+    def select_pitcher_by_id(self, pitcher_id: int, prefer_branch: Optional[str] = None):
         """Selecciona un lanzador, extrae su historial y carga sus juegos."""
         found = None
         for p in self.search_results:
@@ -163,23 +165,27 @@ class PitchingState(AppState):
                 found = p
                 break
         if not found:
-            # Buscar individualmente
-            res = search_pitchers(str(pitcher_id))
-            if res:
-                found = res[0]
+            # Buscar individualmente por ID numérico en endpoint directo
+            found = get_pitcher_by_id(pitcher_id)
 
         if not found:
             return
 
         self.selected_pitcher = found
         self.has_pitcher_selected = True
+        self.has_lvbp_history = bool(found.get("has_lvbp_history", False))
         self.has_caracas_history = bool(found.get("has_caracas_history", False))
 
-        # Por defecto abrir la pestaña MLB a menos que sea exclusivo de LVBP
-        if not self.has_caracas_history:
-            self.active_branch = "mlb"
-        elif self.active_branch not in ("mlb", "lvbp"):
+        # Determinar rama activa
+        if prefer_branch in ("lvbp", "mlb"):
+            if prefer_branch == "lvbp" and self.has_lvbp_history:
+                self.active_branch = "lvbp"
+            else:
+                self.active_branch = prefer_branch
+        elif self.has_lvbp_history:
             self.active_branch = "lvbp"
+        else:
+            self.active_branch = "mlb"
 
         self.search_results = []
         self.search_query = ""
@@ -188,6 +194,8 @@ class PitchingState(AppState):
     def clear_selection(self):
         """Regresa al estado inicial con buscador centrado."""
         self.has_pitcher_selected = False
+        self.has_lvbp_history = False
+        self.has_caracas_history = False
         self.selected_pitcher = {}
         self.game_logs = []
         self.game_log_options = []
@@ -207,8 +215,8 @@ class PitchingState(AppState):
     # ── Manejadores de Salidas, Ramas y Modos Temporales ────────────────────
 
     def set_active_branch(self, branch: str):
-        """Cambia entre la rama MLB/MiLB (Statcast) y Leones del Caracas (LVBP)."""
-        if branch == "lvbp" and not self.has_caracas_history:
+        """Cambia entre la rama MLB/MiLB (Statcast) y LVBP."""
+        if branch == "lvbp" and not self.has_lvbp_history:
             return
         self.active_branch = branch
         self.load_pitcher_games()
@@ -292,8 +300,21 @@ class PitchingState(AppState):
             try:
                 s_int = int(self.pitcher_season)
             except (ValueError, TypeError):
-                s_int = 2024
+                s_int = 2025
             logs = get_pitcher_game_logs(p_id, s_int, is_lvbp=is_lvbp)
+
+            # Auto-detección inteligente: si la temporada actual no tiene salidas registradas,
+            # buscar en las temporadas históricas disponibles y fijar la primera con datos.
+            if not logs:
+                for alt_s in [2025, 2024, 2023, 2022]:
+                    if alt_s != s_int:
+                        alt_logs = get_pitcher_game_logs(p_id, alt_s, is_lvbp=is_lvbp)
+                        if alt_logs:
+                            s_int = alt_s
+                            self.pitcher_season = str(alt_s)
+                            logs = alt_logs
+                            break
+
             self.game_logs = logs
 
             opts = [
@@ -750,23 +771,30 @@ class PitchingState(AppState):
 
     def on_load(self):
         """Manejador inicial al navegar a la página /pitching."""
-        # Si ya hay un lanzador seleccionado, no resetear
-        if self.has_pitcher_selected:
-            return
-
-        # Comprobar si viene un pitcher_id por query params (ej: /pitching?pitcher_id=544150)
         p_id = self.router.page.params.get("pitcher_id")
+        p_name = self.router.page.params.get("pitcher_name")
+        branch_param = self.router.page.params.get("branch")
+
+        # 1. Comprobar si viene un pitcher_id por query params (ej: /pitching?pitcher_id=645307)
         if p_id:
             try:
-                self.select_pitcher_by_id(int(p_id))
-                return
+                p_id_int = int(p_id)
+                # Si no hay lanzador seleccionado o es uno diferente al actual, cargar el nuevo
+                if not (self.has_pitcher_selected and self.selected_pitcher.get("id") == p_id_int):
+                    self.select_pitcher_by_id(p_id_int, prefer_branch=branch_param or "lvbp")
+                    return
             except (ValueError, TypeError):
                 pass
 
-        # Comprobar si viene un pitcher_name por query params (ej: /pitching?pitcher_name=Erick+Leal)
-        p_name = self.router.page.params.get("pitcher_name")
+        # 2. Comprobar si viene un pitcher_name por query params (ej: /pitching?pitcher_name=Ricardo+Sanchez)
         if p_name:
-            self.search_query = p_name
-            self.perform_search()
-            if self.search_results:
-                self.select_pitcher_by_id(self.search_results[0]["id"])
+            if not (self.has_pitcher_selected and self.selected_pitcher.get("name", "").lower() == str(p_name).lower()):
+                self.search_query = p_name
+                self.perform_search()
+                if self.search_results:
+                    self.select_pitcher_by_id(self.search_results[0]["id"], prefer_branch=branch_param or "lvbp")
+                    return
+
+        # 3. Si ya hay un lanzador seleccionado y no hay nuevos parámetros de consulta, mantener estado
+        if self.has_pitcher_selected:
+            return

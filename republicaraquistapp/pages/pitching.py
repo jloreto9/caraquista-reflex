@@ -167,6 +167,10 @@ def search_result_item(p: Dict[str, Any]) -> rx.Component:
                     rx.cond(
                         p["has_caracas_history"],
                         rx.badge("🦁 LEONES DEL CARACAS", style=GOLD_BADGE_STYLE, size="1"),
+                        rx.cond(
+                            p["has_lvbp_history"],
+                            rx.badge(f"🇻🇪 {p['lvbp_team_abbr']}", variant="surface", color_scheme="amber", size="1"),
+                        ),
                     ),
                     align="center",
                     spacing="2",
@@ -230,11 +234,15 @@ def controls_bar() -> rx.Component:
                         on_click=PitchingState.set_active_branch("mlb"),
                     ),
                     rx.button(
-                        "🦁 Leones del Caracas (LVBP)",
+                        rx.cond(
+                            PitchingState.has_caracas_history,
+                            "🦁 Leones del Caracas (LVBP)",
+                            "🇻🇪 LVBP",
+                        ),
                         size="2",
                         variant=rx.cond(PitchingState.active_branch == "lvbp", "solid", "outline"),
                         color_scheme=rx.cond(PitchingState.active_branch == "lvbp", "amber", "gray"),
-                        disabled=~PitchingState.has_caracas_history,
+                        disabled=~PitchingState.has_lvbp_history,
                         on_click=PitchingState.set_active_branch("lvbp"),
                     ),
                     spacing="2",
@@ -391,7 +399,11 @@ def pitcher_header_banner() -> rx.Component:
                         rx.heading(p["name"], size="6", font_weight="800", color=TEXT_PRIMARY),
                         rx.cond(
                             PitchingState.active_branch == "lvbp",
-                            rx.badge("LVBP • LEONES DEL CARACAS", style=GOLD_BADGE_STYLE),
+                            rx.cond(
+                                PitchingState.has_caracas_history,
+                                rx.badge("LVBP • LEONES DEL CARACAS", style=GOLD_BADGE_STYLE),
+                                rx.badge(f"LVBP • {p['lvbp_team_abbr']}", style=GOLD_BADGE_STYLE),
+                            ),
                             rx.badge("STATCAST HAWK-EYE", color_scheme="blue"),
                         ),
                         rx.badge("Inspirado en @TJStats", variant="surface", color_scheme="gray", size="1"),

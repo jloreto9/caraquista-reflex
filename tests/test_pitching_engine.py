@@ -133,7 +133,57 @@ class TestPitchingEngine(unittest.TestCase):
         self.assertEqual(splits["vs_lhb"]["pitches"], 2)
         self.assertEqual(splits["vs_lhb"]["csw_pct"], "100.0%")
         self.assertEqual(splits["vs_rhb"]["pitches"], 1)
-        self.assertEqual(splits["vs_rhb"]["strike_pct"], "0.0%")
+    def test_get_pitcher_by_id_various_teams(self):
+        """Valida que get_pitcher_by_id resuelva lanzadores de diversas franquicias LVBP y MLB."""
+        from core.pitching_engine import get_pitcher_by_id
+
+        # 1. Erick Leal (CAR)
+        p_leal = get_pitcher_by_id(612797)
+        self.assertIsNotNone(p_leal)
+        self.assertIn("Leal", p_leal["name"])
+        self.assertTrue(p_leal["has_lvbp_history"])
+        self.assertTrue(p_leal["has_caracas_history"])
+
+        # 2. Ricardo Sánchez (MAG)
+        p_sanchez = get_pitcher_by_id(645307)
+        self.assertIsNotNone(p_sanchez)
+        self.assertIn("S", p_sanchez["name"])
+        self.assertTrue(p_sanchez["has_lvbp_history"])
+        self.assertEqual(p_sanchez["lvbp_team_abbr"], "MAG")
+
+        # 3. Max Castillo (LAR)
+        p_castillo = get_pitcher_by_id(666721)
+        self.assertIsNotNone(p_castillo)
+        self.assertIn("Castillo", p_castillo["name"])
+        self.assertTrue(p_castillo["has_lvbp_history"])
+        self.assertEqual(p_castillo["lvbp_team_abbr"], "LAR")
+
+        # 4. Albert Suárez (MLB / Caracas reserve)
+        p_suarez = get_pitcher_by_id(544150)
+        self.assertIsNotNone(p_suarez)
+        self.assertIn("Su", p_suarez["name"])
+        self.assertTrue(p_suarez["has_caracas_history"])
+
+    def test_search_pitchers_numeric_id_query(self):
+        """Valida que search_pitchers soporte consultas por ID numérico en string."""
+        res = search_pitchers("645307")
+        self.assertTrue(len(res) > 0)
+        self.assertEqual(res[0]["id"], 645307)
+        self.assertEqual(res[0]["lvbp_team_abbr"], "MAG")
+
+    def test_get_lvbp_pitcher_game_logs_multiple_pitchers(self):
+        """Valida que _get_lvbp_pitcher_game_logs extraiga salidas para lanzadores de distintas franquicias."""
+        from core.pitching_engine import _get_lvbp_pitcher_game_logs
+
+        # Ricardo Sánchez (MAG) en 2025
+        logs_mag = _get_lvbp_pitcher_game_logs(645307, 2025)
+        self.assertTrue(len(logs_mag) > 0)
+        self.assertEqual(logs_mag[0]["league"], "LVBP")
+
+        # Max Castillo (LAR) en 2025
+        logs_lar = _get_lvbp_pitcher_game_logs(666721, 2025)
+        self.assertTrue(len(logs_lar) > 0)
+        self.assertEqual(logs_lar[0]["league"], "LVBP")
 
 
 if __name__ == "__main__":

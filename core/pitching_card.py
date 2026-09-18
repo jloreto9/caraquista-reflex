@@ -798,15 +798,16 @@ def build_lvbp_matplotlib_summary(
     # Si es modo temporada completa o rango de fechas
     if mode in ("season", "range"):
         logs = list(game_logs or [])
+        team_label = pitcher_info.get("lvbp_team_name") or pitcher_info.get("team") or "Leones del Caracas"
         if mode == "range":
             s_d = str(start_date) if start_date else f"{season}-10-01"
             e_d = str(end_date) if end_date else f"{season}-12-31"
             logs = [g for g in logs if s_d <= str(g.get("date", "")) <= e_d]
             sub1 = "LVBP • Resumen por Rango de Fechas"
-            sub2 = f"Leones del Caracas | {s_d} al {e_d}"
+            sub2 = f"{team_label} | {s_d} al {e_d}"
         else:
             sub1 = "LVBP • Resumen de Temporada Completa"
-            sub2 = f"Leones del Caracas | Temporada {season}"
+            sub2 = f"{team_label} | Temporada {season}"
 
         if not logs:
             fig, ax = plt.subplots(figsize=(10, 10), facecolor='white')
@@ -1056,8 +1057,9 @@ def build_lvbp_matplotlib_summary(
 
     opp = game_summary.get("opponent", "Rival")
     dt = game_summary.get("date", "")
+    team_label = pitcher_info.get("lvbp_team_name") or pitcher_info.get("team") or "Leones del Caracas"
     _plot_headshot(ax_headshot, pitcher_info.get("photo_url"))
-    _plot_bio(ax_bio, pitcher_info, f"LVBP • Leones del Caracas vs {opp}", f"Fecha: {dt} | Temporada {season}")
+    _plot_bio(ax_bio, pitcher_info, f"LVBP • {team_label} vs {opp}", f"Fecha: {dt} | Temporada {season}")
     _plot_logo(ax_logo)
 
     kpis = analysis.get("pbp_kpis", {})
