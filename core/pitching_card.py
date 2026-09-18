@@ -276,9 +276,9 @@ def _plot_headshot(ax: plt.Axes, photo_url: Optional[str]):
             pass
 
     if img is not None:
-        ax.set_xlim(0, 1.2)
-        ax.set_ylim(0, 1)
-        ax.imshow(img, extent=[0, 1.0, 0, 1], origin='upper')
+        ax.set_xlim(0, 1.0)
+        ax.set_ylim(0, 1.0)
+        ax.imshow(img, extent=[0.0, 1.0, 0.0, 1.0], origin='upper')
 
 
 def _plot_bio(ax: plt.Axes, pitcher_info: Dict[str, Any], subtitle_line1: str, subtitle_line2: str):
@@ -289,10 +289,15 @@ def _plot_bio(ax: plt.Axes, pitcher_info: Dict[str, Any], subtitle_line1: str, s
     height = pitcher_info.get("height", "6' 2\"")
     weight = pitcher_info.get("weight", 200)
 
-    ax.text(0.5, 1.00, f"{p_name}", va='top', ha='center', fontsize=42, fontweight='bold', color='#070B19')
-    ax.text(0.5, 0.68, f"{throws}HP, Edad: {age}, {height} / {weight} lbs", va='top', ha='center', fontsize=22, color='#475569')
-    ax.text(0.5, 0.42, f"{subtitle_line1}", va='top', ha='center', fontsize=28, fontweight='bold', color='#D97706')
-    ax.text(0.5, 0.16, f"{subtitle_line2}", va='top', ha='center', fontsize=22, fontstyle='italic', color='#64748B')
+    ax.text(0.5, 0.88, f"{p_name}", va='top', ha='center', fontsize=36, fontweight='bold', color='#070B19')
+    ax.text(0.5, 0.62, f"{throws}HP • Edad: {age} • {height} / {weight} lbs", va='top', ha='center', fontsize=18, color='#475569')
+
+    # Subtítulos con tamaño y ajuste adaptable para evitar desborde
+    fs_sub1 = 20 if len(subtitle_line1) <= 35 else (17 if len(subtitle_line1) <= 45 else 15)
+    ax.text(0.5, 0.38, f"{subtitle_line1}", va='top', ha='center', fontsize=fs_sub1, fontweight='bold', color='#D97706')
+
+    fs_sub2 = 16 if len(subtitle_line2) <= 35 else 14
+    ax.text(0.5, 0.16, f"{subtitle_line2}", va='top', ha='center', fontsize=fs_sub2, fontstyle='italic', color='#64748B')
 
 
 def _plot_logo(ax: plt.Axes):
@@ -301,13 +306,13 @@ def _plot_logo(ax: plt.Axes):
     if os.path.exists(LOGO_PATH):
         try:
             img = Image.open(LOGO_PATH)
-            ax.set_xlim(0, 1.3)
-            ax.set_ylim(0, 1)
-            ax.imshow(img, extent=[0.2, 1.1, 0, 1], origin='upper')
+            ax.set_xlim(0, 1.0)
+            ax.set_ylim(0, 1.0)
+            ax.imshow(img, extent=[0.0, 1.0, 0.0, 1.0], origin='upper')
             return
         except Exception:
             pass
-    ax.text(0.5, 0.5, "REPÚBLICA\nCARAQUISTA", ha='center', va='center', fontsize=24, fontweight='bold', color='#D97706')
+    ax.text(0.5, 0.5, "REPÚBLICA\nCARAQUISTA", ha='center', va='center', fontsize=18, fontweight='bold', color='#D97706')
 
 
 def _plot_summary_table(ax: plt.Axes, stats_data: Dict[str, Any], is_game: bool):
@@ -354,17 +359,17 @@ def _plot_summary_table(ax: plt.Axes, stats_data: Dict[str, Any], is_game: bool)
         tbl.get_celld()[(1, i)].get_text().set_fontweight('bold')
 
 
-def _plot_velocity_kdes(df: pd.DataFrame, ax: plt.Axes, gs: gridspec.GridSpec, gs_x: list, gs_y: list, fig: plt.Figure, df_statcast_group: pd.DataFrame):
+def _plot_velocity_kdes(df: pd.DataFrame, ax: plt.Axes, subplot_spec: Any, fig: plt.Figure, df_statcast_group: pd.DataFrame):
     """Genera las curvas de densidad KDE de velocidad por tipo de lanzamiento."""
     ax.axis('off')
-    ax.set_title('Pitch Velocity Distribution', fontdict={'size': 20, 'weight': 'bold', 'color': '#070B19'})
+    ax.set_title('Pitch Velocity Distribution', fontdict={'size': 16, 'weight': 'bold', 'color': '#070B19'}, pad=10)
 
     counts = df['pitch_type'].value_counts()
     items = counts.index.tolist()
     if not items:
         return
 
-    inner_grid = gridspec.GridSpecFromSubplotSpec(len(items), 1, subplot_spec=gs[gs_x[0]:gs_x[-1], gs_y[0]:gs_y[-1]])
+    inner_grid = gridspec.GridSpecFromSubplotSpec(len(items), 1, subplot_spec=subplot_spec)
     ax_top = []
     for inner in inner_grid:
         ax_top.append(fig.add_subplot(inner))
@@ -591,12 +596,23 @@ def _plot_pitch_table(df: pd.DataFrame, ax: plt.Axes, df_statcast_group: pd.Data
             cell_0.set_text_props(color='#FDB827', fontweight='bold')
 
 
-def _plot_footer(ax: plt.Axes):
-    """Muestra el pie de página oficial con atribución y créditos claros."""
+def _plot_footer(ax: plt.Axes, is_lvbp: bool = False):
+    """Muestra el pie de página oficial con atribución y créditos claros sin solapamientos."""
     ax.axis('off')
-    ax.text(0.0, 0.70, 'República Caraquista • @republicaraquista • Jorge Leonardo Loreto', ha='left', va='center', fontsize=20, fontweight='bold', color='#070B19')
-    ax.text(0.5, 0.70, 'Colour Coding Compares to League Average By Pitch', ha='center', va='center', fontsize=16, color='#64748B', fontstyle='italic')
-    ax.text(1.0, 0.70, 'Diseño inspirado en Thomas Nestico (@TJStats) • Data: MLB Statcast / Savant', ha='right', va='center', fontsize=18, color='#070B19')
+    # Izquierda: Branding República Caraquista
+    ax.text(0.0, 0.72, 'República Caraquista', ha='left', va='center', fontsize=18, fontweight='bold', color='#070B19')
+    ax.text(0.0, 0.28, '@republicaraquista • Jorge Leonardo Loreto', ha='left', va='center', fontsize=13, color='#64748B')
+
+    # Centro: Explicación de colores o metodología
+    if not is_lvbp:
+        ax.text(0.5, 0.50, 'Colour Coding Compares to League Average By Pitch', ha='center', va='center', fontsize=14, color='#475569', fontstyle='italic')
+    else:
+        ax.text(0.5, 0.50, 'Play-by-Play Sabermétrico • Tango RE24 Leverage Index', ha='center', va='center', fontsize=14, color='#475569', fontstyle='italic')
+
+    # Derecha: Créditos y Fuentes
+    ax.text(1.0, 0.72, 'Diseño inspirado en Thomas Nestico (@TJStats)', ha='right', va='center', fontsize=14, fontweight='bold', color='#070B19')
+    src_data = 'Data: MLB Stats API / Gameday PBP' if is_lvbp else 'Data: MLB Statcast / Baseball Savant'
+    ax.text(1.0, 0.28, src_data, ha='right', va='center', fontsize=13, color='#64748B')
 
 
 # ── 3. Generador Principal de Pitching Summary en Matplotlib ──────────────────
@@ -635,15 +651,16 @@ def build_nestico_pitching_summary(
         width_ratios=[1, 18, 18, 18, 18, 18, 18, 1]
     )
 
-    ax_headshot = fig.add_subplot(gs[1, 1:3])
-    ax_bio = fig.add_subplot(gs[1, 3:5])
-    ax_logo = fig.add_subplot(gs[1, 5:7])
+    ax_headshot = fig.add_subplot(gs[1, 1])
+    ax_bio = fig.add_subplot(gs[1, 2:6])
+    ax_logo = fig.add_subplot(gs[1, 6])
 
     ax_season_table = fig.add_subplot(gs[2, 1:7])
 
-    ax_plot_1 = fig.add_subplot(gs[3, 1:3])
-    ax_plot_2 = fig.add_subplot(gs[3, 3:5])
-    ax_plot_3 = fig.add_subplot(gs[3, 5:7])
+    gs_plots = gridspec.GridSpecFromSubplotSpec(1, 3, subplot_spec=gs[3, 1:7], wspace=0.36)
+    ax_plot_1 = fig.add_subplot(gs_plots[0, 0])
+    ax_plot_2 = fig.add_subplot(gs_plots[0, 1])
+    ax_plot_3 = fig.add_subplot(gs_plots[0, 2])
 
     ax_table = fig.add_subplot(gs[4, 1:7])
     ax_footer = fig.add_subplot(gs[-1, 1:7])
@@ -672,7 +689,7 @@ def build_nestico_pitching_summary(
     _calc_and_plot_summary_table(ax_season_table, df, mode, stats_data, game_summary)
 
     # Panel triple
-    _plot_velocity_kdes(df, ax_plot_1, gs, [3, 4], [1, 3], fig, df_statcast_group)
+    _plot_velocity_kdes(df, ax_plot_1, gs_plots[0, 0], fig, df_statcast_group)
 
     if mode == "game" or df['game_date'].nunique() < 3:
         _plot_strike_zone(df, ax_plot_2)
@@ -760,14 +777,15 @@ def build_lvbp_matplotlib_summary(
         width_ratios=[1, 18, 18, 18, 18, 18, 18, 1]
     )
 
-    ax_headshot = fig.add_subplot(gs[1, 1:3])
-    ax_bio = fig.add_subplot(gs[1, 3:5])
-    ax_logo = fig.add_subplot(gs[1, 5:7])
+    ax_headshot = fig.add_subplot(gs[1, 1])
+    ax_bio = fig.add_subplot(gs[1, 2:6])
+    ax_logo = fig.add_subplot(gs[1, 6])
     ax_season_table = fig.add_subplot(gs[2, 1:7])
 
-    ax_plot_1 = fig.add_subplot(gs[3, 1:3])
-    ax_plot_2 = fig.add_subplot(gs[3, 3:5])
-    ax_plot_3 = fig.add_subplot(gs[3, 5:7])
+    gs_plots = gridspec.GridSpecFromSubplotSpec(1, 3, subplot_spec=gs[3, 1:7], wspace=0.36)
+    ax_plot_1 = fig.add_subplot(gs_plots[0, 0])
+    ax_plot_2 = fig.add_subplot(gs_plots[0, 1])
+    ax_plot_3 = fig.add_subplot(gs_plots[0, 2])
 
     ax_table = fig.add_subplot(gs[4, 1:7])
     ax_footer = fig.add_subplot(gs[-1, 1:7])
@@ -779,6 +797,7 @@ def build_lvbp_matplotlib_summary(
     _plot_logo(ax_logo)
 
     kpis = analysis.get("pbp_kpis", {})
+    tot_pitches = game_summary.get('pitches') or analysis.get('total_pitches') or len(analysis.get('pitches', [])) or 0
     st = {
         'ip': game_summary.get('ip', '0.0'),
         'h': game_summary.get('h', 0),
@@ -786,23 +805,32 @@ def build_lvbp_matplotlib_summary(
         'er': game_summary.get('er', 0),
         'bb': game_summary.get('bb', 0),
         'so': game_summary.get('so', 0),
-        'pitches': game_summary.get('pitches', analysis.get('total_pitches', 0)),
+        'pitches': tot_pitches,
         'csw_pct': kpis.get('csw_pct', '—'),
     }
     _plot_summary_table(ax_season_table, st, is_game=True)
 
-    # Plot 1: Workload por entrada
+    # Plot 1: Workload por entrada (Stacked bar: Strikes vs Bolas)
     workload = analysis.get("innings_workload", [])
     if workload:
         inns = [w["inning"] for w in workload]
         p_counts = [w["pitches"] for w in workload]
         strks = [w.get("strikes", 0) for w in workload]
-        ax_plot_1.bar(inns, p_counts, color='#FDB827', edgecolor='#0F172A', label='Pitcheos')
-        ax_plot_1.bar(inns, strks, color='#0F172A', edgecolor='#0F172A', label='Strikes', alpha=0.7)
-        ax_plot_1.set_xlabel('Entrada (Inning)', fontsize=14, fontweight='bold', color='#070B19')
-        ax_plot_1.set_ylabel('Cantidad de Pitcheos', fontsize=14, fontweight='bold', color='#070B19')
-        ax_plot_1.set_title('Carga de Pitcheos por Entrada', fontsize=18, fontweight='bold', color='#070B19')
-        ax_plot_1.legend(loc='upper right')
+        bolas = [max(0, p - s) for p, s in zip(p_counts, strks)]
+
+        ax_plot_1.bar(inns, strks, color='#0F172A', edgecolor='#0F172A', label='Strikes', width=0.55)
+        ax_plot_1.bar(inns, bolas, bottom=strks, color='#FDB827', edgecolor='#0F172A', label='Bolas', width=0.55)
+
+        for inn, tot in zip(inns, p_counts):
+            ax_plot_1.text(inn, tot + 0.6, str(tot), ha='center', va='bottom', fontsize=11, fontweight='bold', color='#070B19')
+
+        ax_plot_1.set_xticks(inns)
+        ax_plot_1.set_xticklabels([f"Inn {i}" for i in inns], fontsize=11, fontweight='bold')
+        ax_plot_1.set_ylim(0, max(p_counts) * 1.25 if p_counts else 25)
+        ax_plot_1.set_xlabel('Entrada (Inning)', fontsize=13, fontweight='bold', color='#070B19')
+        ax_plot_1.set_ylabel('Pitcheos Totales', fontsize=13, fontweight='bold', color='#070B19')
+        ax_plot_1.set_title('Carga por Entrada', fontsize=16, fontweight='bold', color='#070B19')
+        ax_plot_1.legend(loc='upper right', fontsize=10)
         ax_plot_1.grid(True, linestyle='--', alpha=0.3)
     else:
         ax_plot_1.axis('off')
@@ -811,32 +839,64 @@ def build_lvbp_matplotlib_summary(
     if workload:
         inns = [w["inning"] for w in workload]
         lis = [w.get("avg_li", 1.0) for w in workload]
-        ax_plot_2.plot(inns, lis, marker='o', linewidth=3, markersize=8, color='#D97706', label='Leverage Index')
-        ax_plot_2.axhline(y=1.0, color='#64748B', linestyle='--', label='Presión Promedio (1.0 LI)')
-        ax_plot_2.set_xlabel('Entrada (Inning)', fontsize=14, fontweight='bold', color='#070B19')
-        ax_plot_2.set_ylabel('Leverage Index Promedio', fontsize=14, fontweight='bold', color='#070B19')
-        ax_plot_2.set_title('Índice de Apalancamiento (Tango RE24)', fontsize=18, fontweight='bold', color='#070B19')
-        ax_plot_2.legend(loc='upper right')
+        ax_plot_2.plot(inns, lis, marker='o', linewidth=2.8, markersize=8, color='#D97706', label='LI Promedio')
+        ax_plot_2.axhline(y=1.0, color='#64748B', linestyle='--', linewidth=1.5, label='Presión Base (1.0 LI)')
+
+        for inn, li_val in zip(inns, lis):
+            ax_plot_2.text(inn, li_val + 0.08, f"{li_val:.2f}", ha='center', va='bottom', fontsize=10, fontweight='bold', color='#D97706')
+
+        ax_plot_2.set_xticks(inns)
+        ax_plot_2.set_xticklabels([f"Inn {i}" for i in inns], fontsize=11, fontweight='bold')
+        max_li = max(lis) if lis else 1.0
+        ax_plot_2.set_ylim(0, max(max_li * 1.3, 2.0))
+        ax_plot_2.set_xlabel('Entrada (Inning)', fontsize=13, fontweight='bold', color='#070B19')
+        ax_plot_2.set_ylabel('Leverage Index (LI)', fontsize=13, fontweight='bold', color='#070B19')
+        ax_plot_2.set_title('Apalancamiento (Tango RE24)', fontsize=16, fontweight='bold', color='#070B19')
+        ax_plot_2.legend(loc='upper right', fontsize=10)
         ax_plot_2.grid(True, linestyle='--', alpha=0.3)
     else:
         ax_plot_2.axis('off')
 
-    # Plot 3: Platoon Splits
+    # Plot 3: Platoon Splits (LHB vs RHB en tasa 0-100%)
     splits = analysis.get("splits_platoon", {})
     vs_l = splits.get("vs_lhb", {})
     vs_r = splits.get("vs_rhb", {})
-    cats = ['Pitcheos', 'Whiff%', 'CSW%', 'Strike%']
-    vals_l = [vs_l.get('pitches', 0), float(str(vs_l.get('whiff_pct', '0')).replace('%', '')), float(str(vs_l.get('csw_pct', '0')).replace('%', '')), float(str(vs_l.get('strike_pct', '0')).replace('%', ''))]
-    vals_r = [vs_r.get('pitches', 0), float(str(vs_r.get('whiff_pct', '0')).replace('%', '')), float(str(vs_r.get('csw_pct', '0')).replace('%', '')), float(str(vs_r.get('strike_pct', '0')).replace('%', ''))]
+    p_l = vs_l.get('pitches', 0)
+    p_r = vs_r.get('pitches', 0)
+
+    cats = ['Strike%', 'Whiff%', 'CSW%']
+    vals_l = [
+        float(str(vs_l.get('strike_pct', '0')).replace('%', '')),
+        float(str(vs_l.get('whiff_pct', '0')).replace('%', '')),
+        float(str(vs_l.get('csw_pct', '0')).replace('%', ''))
+    ]
+    vals_r = [
+        float(str(vs_r.get('strike_pct', '0')).replace('%', '')),
+        float(str(vs_r.get('whiff_pct', '0')).replace('%', '')),
+        float(str(vs_r.get('csw_pct', '0')).replace('%', ''))
+    ]
 
     x = np.arange(len(cats))
     width = 0.35
-    ax_plot_3.bar(x - width/2, vals_l, width, label='vs Zurdos (LHB)', color='#3B82F6', edgecolor='#0F172A')
-    ax_plot_3.bar(x + width/2, vals_r, width, label='vs Derechos (RHB)', color='#F59E0B', edgecolor='#0F172A')
+    bars_l = ax_plot_3.bar(x - width/2, vals_l, width, label=f"vs Zurdos ({p_l} P)", color='#3B82F6', edgecolor='#0F172A')
+    bars_r = ax_plot_3.bar(x + width/2, vals_r, width, label=f"vs Derechos ({p_r} P)", color='#F59E0B', edgecolor='#0F172A')
+
+    for rect in bars_l:
+        h = rect.get_height()
+        if h > 0:
+            ax_plot_3.text(rect.get_x() + rect.get_width()/2., h + 1.2, f"{h:.0f}%", ha='center', va='bottom', fontsize=10, fontweight='bold', color='#1E40AF')
+    for rect in bars_r:
+        h = rect.get_height()
+        if h > 0:
+            ax_plot_3.text(rect.get_x() + rect.get_width()/2., h + 1.2, f"{h:.0f}%", ha='center', va='bottom', fontsize=10, fontweight='bold', color='#B45309')
+
     ax_plot_3.set_xticks(x)
-    ax_plot_3.set_xticklabels(cats, fontsize=12, fontweight='bold')
-    ax_plot_3.set_title('Platoon Splits: LHB vs RHB', fontsize=18, fontweight='bold', color='#070B19')
-    ax_plot_3.legend(loc='upper right')
+    ax_plot_3.set_xticklabels(cats, fontsize=11, fontweight='bold')
+    ax_plot_3.set_ylim(0, 100)
+    ax_plot_3.yaxis.set_major_formatter(mtick.PercentFormatter(xmax=100, decimals=0))
+    ax_plot_3.set_ylabel('Porcentaje (%)', fontsize=13, fontweight='bold', color='#070B19')
+    ax_plot_3.set_title('Platoon Splits (LHB vs RHB)', fontsize=16, fontweight='bold', color='#070B19')
+    ax_plot_3.legend(loc='upper right', fontsize=10)
     ax_plot_3.grid(True, linestyle='--', alpha=0.3)
 
     # Tabla PBP de destinos
@@ -849,16 +909,20 @@ def build_lvbp_matplotlib_summary(
             cellText=t_data,
             colLabels=t_cols,
             cellLoc='center',
-            bbox=[0.1, 0.0, 0.8, 1.0]
+            bbox=[0.12, 0.05, 0.76, 0.90]
         )
         pbp_table.auto_set_font_size(False)
-        pbp_table.set_fontsize(16)
+        pbp_table.set_fontsize(15)
         for i in range(3):
             pbp_table.get_celld()[(0, i)].set_facecolor('#0F172A')
             pbp_table.get_celld()[(0, i)].get_text().set_color('#FDB827')
             pbp_table.get_celld()[(0, i)].get_text().set_fontweight('bold')
+        for r_idx in range(len(t_data)):
+            bg = '#FFFFFF' if r_idx % 2 == 0 else '#F8FAFC'
+            for c_idx in range(3):
+                pbp_table.get_celld()[(r_idx + 1, c_idx)].set_facecolor(bg)
 
-    _plot_footer(ax_footer)
+    _plot_footer(ax_footer, is_lvbp=True)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         plt.tight_layout()
