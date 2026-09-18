@@ -22,6 +22,21 @@
 ### 5. Política de Base de Datos (Zero Bloat)
 - La data Statcast de MLB/MiLB descargada debe almacenarse exclusivamente en caché local Parquet (`.cache/statcast/`) y nunca ocupar espacio ni tablas en Supabase.
 
+### 6. Prohibición Estricta de Jerga Técnica y Nombres de Librerías en UI
+- **Cero nombres de librerías en la interfaz:** Prohibido exhibir nombres de librerías internas (como `Matplotlib`, `Matplotlib HD`, `FastAPI`, `Pandas`, etc.) en títulos, subtítulos, botones, tabs o modales dirigidos al usuario. Usar denominaciones descriptivas y sabermétricas limpias (ej: *"Tarjeta Panorámica Oficial de Pitcheo"*, *"Descargar Tarjeta HD"*).
+
+### 7. Compatibilidad Universal de Argumentos en Generadores Gráficos
+- Las firmas de exportación gráfica de alto nivel (como `build_pitching_summary_card`) deben aceptar indistintamente los pares de argumentos utilizados entre capas de la aplicación: `pitcher_info` / `pitcher_data`, `game_summary` / `game_data`, `analysis` / `pitch_analysis`, modos temporales (`game`, `season`, `range`), DataFrames Statcast y `**kwargs` para prevenir `TypeError` por desajuste de parámetros nombrados.
+
+### 8. Proporción de Aspecto 1:1 en Tarjetas Cuadradas LVBP y Eliminación de Distorsión
+- **Clasificación del error:** Ruptura de fidelidad visual por redimensionamiento destructivo (forzar un canvas 1:1 a 16:9).
+- **Causa raíz:** `build_lvbp_matplotlib_summary` genera un canvas cuadrado `(20, 20)` (1:1). Al finalizar, `build_pitching_summary_card` redimensionaba indiscriminadamente a `CANVAS_SIZE = (2400, 1350)` (16:9), aplastando verticalmente los elementos, achatando fotos y deformando textos.
+- **Regla específica:**
+  1. Separar los tamaños canónicos de exportación: `CANVAS_SIZE = (2400, 1350)` para MLB (16:9) y `CANVAS_SIZE_LVBP = (2400, 2400)` para LVBP (1:1).
+  2. En modo temporada/rango de LVBP, emplear los 3 gráficos sabermétricos exactos: Bolas y Strikes apilados, Whiff% por salida y CSW% por salida (con umbral de 30% élite).
+  3. En la cuadrícula, insertar un espaciador vertical (`gs[4]`) de al menos 4 unidades entre los subplots y la tabla inferior para garantizar que las fechas rotadas a 45° nunca colisionen con los encabezados.
+  4. Enriquecer los `game_logs` con `get_game_pitch_data` de forma concurrente para que la columna de Pitcheos muestre el desglose `P (S-B)` en vez de guiones vacíos.
+
 ## Políticas de Red y Prevención de Bloqueos (Curls & Timeouts)
 
 ### 1. Requisito Innegociable de Timeouts en `curl`

@@ -22,6 +22,7 @@ from core.pitching_card import (
     _get_pitch_color,
     PITCH_COLORS,
     CANVAS_SIZE,
+    CANVAS_SIZE_LVBP,
     DPI,
 )
 
@@ -161,7 +162,7 @@ class TestPitchingCard(unittest.TestCase):
 
         img = Image.open(io.BytesIO(png_bytes))
         self.assertEqual(img.format, "PNG")
-        self.assertEqual(img.size, CANVAS_SIZE)
+        self.assertEqual(img.size, CANVAS_SIZE_LVBP)
 
     def test_pitch_colors_coverage(self):
         """Valida que los pitcheos estándar tengan colores definidos."""
