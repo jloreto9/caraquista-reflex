@@ -629,7 +629,7 @@ def pitching_summary_image_card() -> rx.Component:
         rx.vstack(
             rx.hstack(
                 rx.icon("sparkles", size=18, color=ACCENT_GOLD),
-                rx.heading("PITCHING SUMMARY (MATPLOTLIB • METODOLOGÍA THOMAS NESTICO @TJSTATS)", size="3", color=TEXT_PRIMARY),
+                rx.heading("PITCHING SUMMARY", size="3", color=TEXT_PRIMARY),
                 rx.spacer(),
                 rx.button(
                     rx.icon("download", size=15),
@@ -647,7 +647,7 @@ def pitching_summary_image_card() -> rx.Component:
                 rx.center(
                     rx.vstack(
                         rx.spinner(size="3", color=ACCENT_GOLD),
-                        rx.text("Generando visualización gráfica de alta resolución en Matplotlib...", size="2", color=TEXT_MUTED),
+                        rx.text("Generando visualización gráfica de alta resolución...", size="2", color=TEXT_MUTED),
                         spacing="3",
                         align="center",
                     ),
