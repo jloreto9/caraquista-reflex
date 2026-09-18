@@ -23,6 +23,7 @@ from core.pitching_engine import (
     get_game_pitch_data,
     get_statcast_pitcher_df,
     get_pitcher_bio_data,
+    _build_statcast_table,
 )
 from core.pitching_card import (
     build_pitching_summary_card,
@@ -77,20 +78,20 @@ def _plotly_layout_base(title: str = "") -> dict:
 
 
 class PitchingState(AppState):
-    """Estado reactivo de la página Pitching Summary."""
+    """Estado interactivo y sabermétrico para la página de Pitching Summary."""
 
-    # ── Buscador ────────────────────────────────────────────────────────────
+    # ── Estado del Buscador y Selección ─────────────────────────────────────
     search_query: str = ""
     search_results: List[Dict[str, Any]] = []
     is_searching: bool = False
-
-    # ── Selección de Lanzador ────────────────────────────────────────────────
     selected_pitcher: Dict[str, Any] = {}
     has_pitcher_selected: bool = False
     has_caracas_history: bool = False
 
-    # ── Filtros y Configuración ─────────────────────────────────────────────
-    active_branch: str = "mlb"  # "mlb" o "lvbp"
+    # ── Rama Activa: 'mlb' (Statcast) vs 'lvbp' (PBP Leones del Caracas) ────
+    active_branch: str = "mlb"
+
+    # ── Salidas y Temporada ─────────────────────────────────────────────────
     pitcher_season: str = "2024"
     available_seasons: List[str] = ["2025", "2024", "2023", "2022"]
     game_logs: List[Dict[str, Any]] = []
@@ -106,6 +107,18 @@ class PitchingState(AppState):
     range_end_date: str = "2024-06-30"
     rendered_image_url: str = ""
     raw_card_bytes: bytes = b""
+
+    # ── KPIs Activos Agregados (Unificados para Game, Season y Range) ─────────
+    summary_games_count: int = 0
+    active_kpi_ip: str = "0.0"
+    active_kpi_h: str = "0"
+    active_kpi_r: str = "0"
+    active_kpi_er: str = "0"
+    active_kpi_bb: str = "0"
+    active_kpi_so: str = "0"
+    active_kpi_pitches: str = "0"
+    active_kpi_rate1: str = "—"  # CSW% en game, ERA en season/range
+    active_kpi_rate2: str = "—"  # WHIFF% en game, WHIP en season/range
 
     # ── Datos Procesados del Juego ──────────────────────────────────────────
     pitch_analysis: Dict[str, Any] = {}
@@ -203,17 +216,40 @@ class PitchingState(AppState):
     def set_pitcher_season(self, season_val: str):
         """Cambia la temporada seleccionada y recarga salidas."""
         self.pitcher_season = str(season_val)
-        self.range_start_date = f"{self.pitcher_season}-04-01"
-        self.range_end_date = f"{self.pitcher_season}-06-30"
+        try:
+            s_int = int(self.pitcher_season)
+        except (ValueError, TypeError):
+            s_int = 2024
+        if self.active_branch == "lvbp":
+            self.range_start_date = f"{s_int}-10-01"
+            self.range_end_date = f"{s_int + 1}-01-31"
+        else:
+            self.range_start_date = f"{s_int}-04-01"
+            self.range_end_date = f"{s_int}-10-31"
         self.load_pitcher_games()
 
     def set_time_mode(self, mode: str):
         """Cambia el modo temporal: 'game' (Salida), 'season' (Temporada) o 'range' (Rango)."""
         self.time_mode = mode
-        if mode == "game" and self.selected_game_pk:
-            self.load_game_data()
-        else:
+        self.is_generating_card = True
+        yield
+        try:
+            self._sync_active_kpis()
+            if mode == "game" and self.selected_game_pk:
+                self.load_game_data()
+            else:
+                self.generate_card()
+        finally:
+            self.is_generating_card = False
+
+    def update_range(self):
+        """Actualiza la visualización y tarjeta para el rango de fechas seleccionado."""
+        self.is_generating_card = True
+        yield
+        try:
             self.generate_card()
+        finally:
+            self.is_generating_card = False
 
     def set_range_start_date(self, val: str):
         """Actualiza la fecha de inicio para el modo rango."""
@@ -270,7 +306,10 @@ class PitchingState(AppState):
                 self.selected_game_pk = logs[0].get("game_pk", 0)
                 self.current_game_summary = logs[0]
                 self.selected_game_label = opts[0]
-                self.load_game_data()
+                if self.time_mode == "game":
+                    self.load_game_data()
+                else:
+                    self.generate_card()
             else:
                 self.selected_game_pk = 0
                 self.current_game_summary = {}
@@ -525,6 +564,10 @@ class PitchingState(AppState):
                     analysis=self.pitch_analysis,
                     season=s_int,
                     dpi=160,
+                    mode=self.time_mode,
+                    start_date=self.range_start_date,
+                    end_date=self.range_end_date,
+                    game_logs=self.game_logs,
                 )
             else:
                 pitcher_info = dict(self.selected_pitcher)
@@ -547,6 +590,10 @@ class PitchingState(AppState):
                     end_date=self.range_end_date if self.time_mode == "range" else None,
                 )
 
+                # Si es season o range, sincronizar la tabla de repertorio y figuras web
+                if self.time_mode in ("season", "range") and df_sc is not None and not df_sc.empty:
+                    self._sync_mlb_season_data(df_sc)
+
                 raw_bytes = build_nestico_pitching_summary(
                     df=df_sc,
                     pitcher_info=pitcher_info,
@@ -561,8 +608,118 @@ class PitchingState(AppState):
             self.raw_card_bytes = raw_bytes
             b64 = base64.b64encode(raw_bytes).decode("utf-8")
             self.rendered_image_url = f"data:image/png;base64,{b64}"
+            self._sync_active_kpis()
         finally:
             self.is_generating_card = False
+
+    def _sync_mlb_season_data(self, df_sc: pd.DataFrame):
+        """Sincroniza la tabla de repertorio y gráficos de movimiento con el DataFrame Statcast."""
+        try:
+            pitches_list = []
+            for _, row in df_sc.iterrows():
+                p_name = row.get("pitch_name") or "4-Seam Fastball"
+                speed = row.get("release_speed")
+                spin = row.get("release_spin_rate")
+                pfx_x = row.get("pfx_x")
+                pfx_z = row.get("pfx_z")
+                hb = float(pfx_x) * 12.0 if pfx_x is not None and not pd.isna(pfx_x) else 0.0
+                ivb = float(pfx_z) * 12.0 if pfx_z is not None and not pd.isna(pfx_z) else 0.0
+                is_whiff = bool(row.get("whiff", False))
+                desc = str(row.get("description", "")).lower()
+                is_called = "called_strike" in desc
+                is_foul = "foul" in desc
+                is_in_play = "in_play" in desc or "hit_into_play" in desc
+                in_z = bool(row.get("in_zone", False))
+                px = row.get("plate_x")
+                pz = row.get("plate_z")
+
+                pitches_list.append({
+                    "pitch_name": p_name,
+                    "speed": float(speed) if speed is not None and not pd.isna(speed) else None,
+                    "spin": int(spin) if spin is not None and not pd.isna(spin) else None,
+                    "ivb": round(ivb, 1),
+                    "hb": round(hb, 1),
+                    "is_whiff": is_whiff,
+                    "is_called": is_called,
+                    "is_foul": is_foul,
+                    "is_in_play": is_in_play,
+                    "is_zone": in_z,
+                    "plate_x": float(px) if px is not None and not pd.isna(px) else 0.0,
+                    "plate_z": float(pz) if pz is not None and not pd.isna(pz) else 2.5,
+                })
+
+            if pitches_list:
+                self.statcast_table = _build_statcast_table(pitches_list)
+                self.fig_movement = self._build_movement_figure(pitches_list)
+                self.fig_strike_zone = self._build_strike_zone_figure(pitches_list)
+        except Exception:
+            pass
+
+    def _sync_active_kpis(self):
+        """Sincroniza los 9 KPIs ejecutivos del banner superior según el modo temporal."""
+        if self.time_mode == "game":
+            g = self.current_game_summary or {}
+            k = self.pbp_kpis or {}
+            self.summary_games_count = 1 if g else 0
+            self.active_kpi_ip = str(g.get("ip", "0.0"))
+            self.active_kpi_h = str(g.get("h", 0))
+            self.active_kpi_r = str(g.get("r", 0))
+            self.active_kpi_er = str(g.get("er", 0))
+            self.active_kpi_bb = str(g.get("bb", 0))
+            self.active_kpi_so = str(g.get("so", 0))
+            tot_p = g.get("pitches") or (self.pitch_analysis or {}).get("total_pitches") or 0
+            self.active_kpi_pitches = str(tot_p)
+            self.active_kpi_rate1 = str(k.get("csw_pct", "—"))
+            self.active_kpi_rate2 = str(k.get("whiff_pct", "—"))
+        else:
+            # Modo season o range
+            logs = list(self.game_logs or [])
+            if self.time_mode == "range":
+                s_d = self.range_start_date
+                e_d = self.range_end_date
+                logs = [g for g in logs if s_d <= str(g.get("date", "")) <= e_d]
+
+            self.summary_games_count = len(logs)
+            if logs:
+                tot_outs = sum(self._outs_from_ip(g.get("ip", "0.0")) for g in logs)
+                self.active_kpi_ip = f"{tot_outs // 3}.{tot_outs % 3}"
+                float_ip = tot_outs / 3.0
+                tot_h = sum(int(g.get("h") or 0) for g in logs)
+                tot_r = sum(int(g.get("r") or 0) for g in logs)
+                tot_er = sum(int(g.get("er") or 0) for g in logs)
+                tot_bb = sum(int(g.get("bb") or 0) for g in logs)
+                tot_so = sum(int(g.get("so") or 0) for g in logs)
+                tot_pitches = sum(int(g.get("pitches") or 0) for g in logs)
+
+                self.active_kpi_h = str(tot_h)
+                self.active_kpi_r = str(tot_r)
+                self.active_kpi_er = str(tot_er)
+                self.active_kpi_bb = str(tot_bb)
+                self.active_kpi_so = str(tot_so)
+                self.active_kpi_pitches = str(tot_pitches)
+                self.active_kpi_rate1 = f"{(tot_er * 9.0 / float_ip):.2f}" if float_ip > 0 else "0.00"
+                self.active_kpi_rate2 = f"{((tot_bb + tot_h) / float_ip):.2f}" if float_ip > 0 else "0.00"
+            else:
+                self.active_kpi_ip = "0.0"
+                self.active_kpi_h = "0"
+                self.active_kpi_r = "0"
+                self.active_kpi_er = "0"
+                self.active_kpi_bb = "0"
+                self.active_kpi_so = "0"
+                self.active_kpi_pitches = "0"
+                self.active_kpi_rate1 = "0.00"
+                self.active_kpi_rate2 = "0.00"
+
+    @staticmethod
+    def _outs_from_ip(ip_val: Any) -> int:
+        try:
+            s = str(ip_val).strip()
+            if '.' in s:
+                p = s.split('.')
+                return int(p[0]) * 3 + int(p[1])
+            return int(float(s)) * 3
+        except Exception:
+            return 0
 
     def download_pitching_card(self):
         """Descarga la tarjeta gráfica oficial en PNG de alta resolución."""

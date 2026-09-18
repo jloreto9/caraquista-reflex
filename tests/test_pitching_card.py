@@ -297,6 +297,79 @@ class TestPitchingCard(unittest.TestCase):
         img = Image.open(io.BytesIO(png_lvbp))
         self.assertEqual(img.format, "PNG")
 
+    def test_build_lvbp_season_and_range_modes(self):
+        """Valida que build_lvbp_matplotlib_summary genere un PNG válido en modo season y range."""
+        caracas_pitcher = {
+            "name": "Albert Suárez",
+            "throws": "R",
+            "team": "Leones del Caracas",
+            "photo_url": None,
+        }
+        dummy_logs = [
+            {
+                "game_pk": 101, "date": "2024-11-05", "opponent": "Tiburones de La Guaira",
+                "role": "Abridor", "decision": "W", "ip": "5.0", "h": 3, "r": 1, "er": 1,
+                "bb": 1, "so": 5, "pitches": 75, "strikes": 48,
+            },
+            {
+                "game_pk": 102, "date": "2024-11-12", "opponent": "Navegantes del Magallanes",
+                "role": "Abridor", "decision": "W", "ip": "6.0", "h": 4, "r": 2, "er": 2,
+                "bb": 0, "so": 7, "pitches": 85, "strikes": 58,
+            },
+            {
+                "game_pk": 103, "date": "2024-11-20", "opponent": "Cardenales de Lara",
+                "role": "Abridor", "decision": "ND", "ip": "4.2", "h": 5, "r": 3, "er": 3,
+                "bb": 2, "so": 4, "pitches": 80, "strikes": 50,
+            },
+        ]
+
+        # Modo Temporada
+        png_season = build_lvbp_matplotlib_summary(
+            pitcher_info=caracas_pitcher,
+            game_summary={},
+            analysis={},
+            season=2024,
+            dpi=100,
+            mode="season",
+            game_logs=dummy_logs,
+        )
+        self.assertIsInstance(png_season, bytes)
+        self.assertGreater(len(png_season), 30000)
+        img_season = Image.open(io.BytesIO(png_season))
+        self.assertEqual(img_season.format, "PNG")
+
+        # Modo Rango de Fechas
+        png_range = build_lvbp_matplotlib_summary(
+            pitcher_info=caracas_pitcher,
+            game_summary={},
+            analysis={},
+            season=2024,
+            dpi=100,
+            mode="range",
+            start_date="2024-11-01",
+            end_date="2024-11-15",
+            game_logs=dummy_logs,
+        )
+        self.assertIsInstance(png_range, bytes)
+        self.assertGreater(len(png_range), 30000)
+        img_range = Image.open(io.BytesIO(png_range))
+        self.assertEqual(img_range.format, "PNG")
+
+        # Rango sin salidas (comprobación defensiva)
+        png_empty = build_lvbp_matplotlib_summary(
+            pitcher_info=caracas_pitcher,
+            game_summary={},
+            analysis={},
+            season=2024,
+            dpi=100,
+            mode="range",
+            start_date="2025-01-01",
+            end_date="2025-01-31",
+            game_logs=dummy_logs,
+        )
+        self.assertIsInstance(png_empty, bytes)
+        self.assertGreater(len(png_empty), 10000)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -760,16 +760,280 @@ def _calc_csw_pct(df: pd.DataFrame) -> str:
 
 # ── 4. Soporte Adaptativo para Leones del Caracas (LVBP) ──────────────────────
 
+def _ip_str_to_outs(ip_val: Any) -> int:
+    """Convierte '5.2' a 17 outs, o 5.0 a 15 outs."""
+    try:
+        s = str(ip_val).strip()
+        if '.' in s:
+            parts = s.split('.')
+            return int(parts[0]) * 3 + int(parts[1])
+        return int(float(s)) * 3
+    except Exception:
+        return 0
+
+
+def _outs_to_ip_str(outs: int) -> str:
+    """Convierte 17 outs a '5.2'."""
+    return f"{outs // 3}.{outs % 3}"
+
+
 def build_lvbp_matplotlib_summary(
     pitcher_info: Dict[str, Any],
-    game_summary: Dict[str, Any],
-    analysis: Dict[str, Any],
+    game_summary: Optional[Dict[str, Any]] = None,
+    analysis: Optional[Dict[str, Any]] = None,
     season: int = 2025,
     dpi: int = 180,
+    mode: str = "game",
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    game_logs: Optional[List[Dict[str, Any]]] = None,
 ) -> bytes:
     """
-    Construye la tarjeta Matplotlib 20x20 adaptada para Leones del Caracas con la data PBP disponible.
+    Construye la tarjeta Matplotlib 20x20 adaptada para Leones del Caracas.
+    Soporta modo salida individual ('game'), temporada completa ('season') o rango de fechas ('range').
     """
+    game_summary = game_summary or {}
+    analysis = analysis or {}
+
+    # Si es modo temporada completa o rango de fechas
+    if mode in ("season", "range"):
+        logs = list(game_logs or [])
+        if mode == "range":
+            s_d = str(start_date) if start_date else f"{season}-10-01"
+            e_d = str(end_date) if end_date else f"{season}-12-31"
+            logs = [g for g in logs if s_d <= str(g.get("date", "")) <= e_d]
+            sub1 = "LVBP • Resumen por Rango de Fechas"
+            sub2 = f"Leones del Caracas | {s_d} al {e_d}"
+        else:
+            sub1 = "LVBP • Resumen de Temporada Completa"
+            sub2 = f"Leones del Caracas | Temporada {season}"
+
+        if not logs:
+            fig, ax = plt.subplots(figsize=(10, 10), facecolor='white')
+            ax.axis('off')
+            ax.text(0.5, 0.5, "No se encontraron salidas registradas para este período.", ha='center', va='center', fontsize=20, color='#64748B')
+            buf = io.BytesIO()
+            fig.savefig(buf, format='png', dpi=dpi, bbox_inches='tight')
+            plt.close(fig)
+            return buf.getvalue()
+
+        fig = plt.figure(figsize=(20, 20), facecolor='white')
+        gs = gridspec.GridSpec(
+            6, 8,
+            height_ratios=[2, 20, 9, 36, 36, 7],
+            width_ratios=[1, 18, 18, 18, 18, 18, 18, 1]
+        )
+
+        ax_headshot = fig.add_subplot(gs[1, 1])
+        ax_bio = fig.add_subplot(gs[1, 2:6])
+        ax_logo = fig.add_subplot(gs[1, 6])
+        ax_season_table = fig.add_subplot(gs[2, 1:7])
+
+        gs_plots = gridspec.GridSpecFromSubplotSpec(1, 3, subplot_spec=gs[3, 1:7], wspace=0.36)
+        ax_plot_1 = fig.add_subplot(gs_plots[0, 0])
+        ax_plot_2 = fig.add_subplot(gs_plots[0, 1])
+        ax_plot_3 = fig.add_subplot(gs_plots[0, 2])
+
+        ax_table = fig.add_subplot(gs[4, 1:7])
+        ax_footer = fig.add_subplot(gs[-1, 1:7])
+
+        _plot_headshot(ax_headshot, pitcher_info.get("photo_url"))
+        _plot_bio(ax_bio, pitcher_info, sub1, sub2)
+        _plot_logo(ax_logo)
+
+        # Cómputo agregado de temporada / rango
+        tot_outs = sum(_ip_str_to_outs(g.get("ip", "0.0")) for g in logs)
+        tot_ip_str = _outs_to_ip_str(tot_outs)
+        float_ip = tot_outs / 3.0
+        tot_games = len(logs)
+        tot_h = sum(int(g.get("h") or 0) for g in logs)
+        tot_r = sum(int(g.get("r") or 0) for g in logs)
+        tot_er = sum(int(g.get("er") or 0) for g in logs)
+        tot_bb = sum(int(g.get("bb") or 0) for g in logs)
+        tot_so = sum(int(g.get("so") or 0) for g in logs)
+        tot_pitches = sum(int(g.get("pitches") or 0) for g in logs)
+
+        era_val = f"{(tot_er * 9.0 / float_ip):.2f}" if float_ip > 0 else "0.00"
+        whip_val = f"{((tot_bb + tot_h) / float_ip):.2f}" if float_ip > 0 else "0.00"
+        k9_val = f"{(tot_so * 9.0 / float_ip):.1f}" if float_ip > 0 else "0.0"
+        bb9_val = f"{(tot_bb * 9.0 / float_ip):.1f}" if float_ip > 0 else "0.0"
+
+        # Barra superior de KPIs resumidos
+        cols_sum = ['IP TOTAL', 'JUEGOS', 'WHIP', 'ERA', 'PONCHES (K)', 'BOLETOS (BB)', 'K/9', 'BB/9']
+        vals_sum = [tot_ip_str, str(tot_games), whip_val, era_val, str(tot_so), str(tot_bb), k9_val, bb9_val]
+
+        ax_season_table.axis('off')
+        tbl = ax_season_table.table(
+            cellText=[vals_sum],
+            colLabels=cols_sum,
+            cellLoc='center',
+            bbox=[0.0, 0.0, 1.0, 1.0]
+        )
+        tbl.auto_set_font_size(False)
+        tbl.set_fontsize(18)
+        for i in range(len(cols_sum)):
+            tbl.get_celld()[(0, i)].set_facecolor('#0F172A')
+            tbl.get_celld()[(0, i)].get_text().set_color('#FDB827')
+            tbl.get_celld()[(0, i)].get_text().set_fontweight('bold')
+            tbl.get_celld()[(1, i)].set_facecolor('#F8FAFC')
+            tbl.get_celld()[(1, i)].get_text().set_fontweight('bold')
+
+        # Ordenar cronológicamente para los gráficos
+        sorted_logs = sorted(logs, key=lambda x: str(x.get('date', '')))
+        plot_logs = sorted_logs[-10:] if len(sorted_logs) > 10 else sorted_logs
+        x_indices = list(range(len(plot_logs)))
+        date_labels = [str(g.get('date', ''))[-5:].replace('-', '/') for g in plot_logs]
+
+        # Plot 1: Pitcheos por Salida (Strikes vs Bolas) o Hits vs CL (fallback si no hay conteo de pitcheos)
+        p_counts = [int(g.get('pitches') or 0) for g in plot_logs]
+        if sum(p_counts) > 0:
+            strks = [int(g.get('strikes') or int(p * 0.62)) for g, p in zip(plot_logs, p_counts)]
+            bolas = [max(0, p - s) for p, s in zip(p_counts, strks)]
+
+            ax_plot_1.bar(x_indices, strks, color='#0F172A', edgecolor='#0F172A', label='Strikes', width=0.55)
+            ax_plot_1.bar(x_indices, bolas, bottom=strks, color='#FDB827', edgecolor='#0F172A', label='Bolas', width=0.55)
+            for idx, tot in zip(x_indices, p_counts):
+                if tot > 0:
+                    ax_plot_1.text(idx, tot + 1.0, str(tot), ha='center', va='bottom', fontsize=10, fontweight='bold', color='#070B19')
+            ax_plot_1.set_xticks(x_indices)
+            ax_plot_1.set_xticklabels(date_labels, fontsize=10, fontweight='bold')
+            ax_plot_1.set_ylim(0, max(p_counts) * 1.25 if p_counts and max(p_counts) > 0 else 30)
+            ax_plot_1.set_xlabel('Fecha de Salida', fontsize=13, fontweight='bold', color='#070B19')
+            ax_plot_1.set_ylabel('Pitcheos Totales', fontsize=13, fontweight='bold', color='#070B19')
+            ax_plot_1.set_title('Pitcheos por Salida', fontsize=16, fontweight='bold', color='#070B19')
+            ax_plot_1.legend(loc='upper right', fontsize=10)
+            ax_plot_1.grid(True, linestyle='--', alpha=0.3)
+        else:
+            # Fallback sabermétrico: Hits (H) vs Carreras Limpias (CL) por salida
+            h_counts = [int(g.get('h') or 0) for g in plot_logs]
+            er_counts = [int(g.get('er') or 0) for g in plot_logs]
+            w1 = 0.35
+            ax_plot_1.bar([xi - w1/2 for xi in x_indices], h_counts, width=w1, color='#F59E0B', edgecolor='#0F172A', label='Hits (H)')
+            ax_plot_1.bar([xi + w1/2 for xi in x_indices], er_counts, width=w1, color='#EF4444', edgecolor='#0F172A', label='CL (ER)')
+            for idx, h_c, er_c in zip(x_indices, h_counts, er_counts):
+                if h_c > 0:
+                    ax_plot_1.text(idx - w1/2, h_c + 0.2, str(h_c), ha='center', va='bottom', fontsize=9, fontweight='bold', color='#B45309')
+                if er_c > 0:
+                    ax_plot_1.text(idx + w1/2, er_c + 0.2, str(er_c), ha='center', va='bottom', fontsize=9, fontweight='bold', color='#991B1B')
+            ax_plot_1.set_xticks(x_indices)
+            ax_plot_1.set_xticklabels(date_labels, fontsize=10, fontweight='bold')
+            max_h_er = max(max(h_counts or [1]), max(er_counts or [1]))
+            ax_plot_1.set_ylim(0, max_h_er * 1.35 + 1)
+            ax_plot_1.set_xlabel('Fecha de Salida', fontsize=13, fontweight='bold', color='#070B19')
+            ax_plot_1.set_ylabel('Cantidad', fontsize=13, fontweight='bold', color='#070B19')
+            ax_plot_1.set_title('Hits (H) vs Carreras Limpias (CL)', fontsize=16, fontweight='bold', color='#070B19')
+            ax_plot_1.legend(loc='upper right', fontsize=10)
+            ax_plot_1.grid(True, linestyle='--', alpha=0.3)
+
+        # Plot 2: K vs BB por Salida
+        k_counts = [int(g.get('so') or 0) for g in plot_logs]
+        bb_counts = [int(g.get('bb') or 0) for g in plot_logs]
+        w = 0.35
+        ax_plot_2.bar([xi - w/2 for xi in x_indices], k_counts, width=w, color='#3B82F6', edgecolor='#0F172A', label='Ponches (K)')
+        ax_plot_2.bar([xi + w/2 for xi in x_indices], bb_counts, width=w, color='#64748B', edgecolor='#0F172A', label='Boletos (BB)')
+        for idx, k_c, bb_c in zip(x_indices, k_counts, bb_counts):
+            if k_c > 0:
+                ax_plot_2.text(idx - w/2, k_c + 0.2, str(k_c), ha='center', va='bottom', fontsize=9, fontweight='bold', color='#1E40AF')
+            if bb_c > 0:
+                ax_plot_2.text(idx + w/2, bb_c + 0.2, str(bb_c), ha='center', va='bottom', fontsize=9, fontweight='bold', color='#334155')
+        ax_plot_2.set_xticks(x_indices)
+        ax_plot_2.set_xticklabels(date_labels, fontsize=10, fontweight='bold')
+        max_k_bb = max(max(k_counts or [1]), max(bb_counts or [1]))
+        ax_plot_2.set_ylim(0, max_k_bb * 1.35 + 1)
+        ax_plot_2.set_xlabel('Fecha de Salida', fontsize=13, fontweight='bold', color='#070B19')
+        ax_plot_2.set_ylabel('Cantidad', fontsize=13, fontweight='bold', color='#070B19')
+        ax_plot_2.set_title('Ponches (K) vs Boletos (BB)', fontsize=16, fontweight='bold', color='#070B19')
+        ax_plot_2.legend(loc='upper right', fontsize=10)
+        ax_plot_2.grid(True, linestyle='--', alpha=0.3)
+
+        # Plot 3: Entradas Lanzadas (IP) por Salida
+        ip_floats = [_ip_str_to_outs(g.get('ip', '0.0')) / 3.0 for g in plot_logs]
+        ip_labels = [str(g.get('ip', '0.0')) for g in plot_logs]
+        ax_plot_3.plot(x_indices, ip_floats, marker='o', linewidth=2.8, markersize=8, color='#D97706', label='IP Lanzadas')
+        avg_ip_f = sum(ip_floats) / len(ip_floats) if ip_floats else 0.0
+        ax_plot_3.axhline(y=avg_ip_f, color='#64748B', linestyle='--', linewidth=1.5, label=f'Promedio ({avg_ip_f:.1f})')
+        for idx, (ip_f, ip_lbl) in enumerate(zip(ip_floats, ip_labels)):
+            ax_plot_3.text(idx, ip_f + 0.2, ip_lbl, ha='center', va='bottom', fontsize=10, fontweight='bold', color='#D97706')
+        ax_plot_3.set_xticks(x_indices)
+        ax_plot_3.set_xticklabels(date_labels, fontsize=10, fontweight='bold')
+        ax_plot_3.set_ylim(0, max(max(ip_floats or [1]) * 1.35, 4.0))
+        ax_plot_3.set_xlabel('Fecha de Salida', fontsize=13, fontweight='bold', color='#070B19')
+        ax_plot_3.set_ylabel('Entradas (IP)', fontsize=13, fontweight='bold', color='#070B19')
+        ax_plot_3.set_title('Entradas por Salida (IP)', fontsize=16, fontweight='bold', color='#070B19')
+        ax_plot_3.legend(loc='upper right', fontsize=10)
+        ax_plot_3.grid(True, linestyle='--', alpha=0.3)
+
+        # Tabla Fila 4: Historial de Salidas del Período
+        ax_table.axis('off')
+        display_logs = sorted_logs[::-1][:8]
+
+        def _clean_team_name(t_name: str) -> str:
+            t = str(t_name).replace("vs ", "").strip()
+            subs = {
+                "Navegantes del Magallanes": "Magallanes",
+                "Leones del Caracas": "Caracas",
+                "Tiburones de La Guaira": "La Guaira",
+                "Tigres de Aragua": "Aragua",
+                "Cardenales de Lara": "Lara",
+                "Águilas del Zulia": "Zulia",
+                "Caribes de Anzoátegui": "Caribes",
+                "Bravos de Margarita": "Bravos",
+            }
+            return subs.get(t, t[:14])
+
+        def _fmt_date_short(d_str: str) -> str:
+            parts = str(d_str).split('-')
+            if len(parts) == 3:
+                return f"{parts[2]}/{parts[1]}/{parts[0][2:]}"
+            return str(d_str)
+
+        t_data = []
+        for g in display_logs:
+            p_val = int(g.get('pitches') or 0)
+            s_val = int(g.get('strikes') or 0)
+            p_str = f"{p_val} ({s_val} S)" if p_val > 0 else "—"
+            t_data.append([
+                _fmt_date_short(g.get('date', '')),
+                _clean_team_name(g.get('opponent', 'Rival')),
+                str(g.get('role', 'Abridor'))[:8],
+                str(g.get('decision', '—') or '—'),
+                str(g.get('ip', '0.0')),
+                str(g.get('h', 0)),
+                str(g.get('er', 0)),
+                str(g.get('bb', 0)),
+                str(g.get('so', 0)),
+                p_str,
+            ])
+
+        t_cols = ['Fecha', 'Rival', 'Rol', 'Dec.', 'IP', 'H', 'CL', 'BB', 'K', 'Pitcheos (P-S)']
+        game_log_table = ax_table.table(
+            cellText=t_data,
+            colLabels=t_cols,
+            colWidths=[0.11, 0.16, 0.10, 0.08, 0.08, 0.07, 0.07, 0.07, 0.08, 0.18],
+            cellLoc='center',
+            bbox=[0.02, 0.04, 0.96, 0.92]
+        )
+        game_log_table.auto_set_font_size(False)
+        game_log_table.set_fontsize(14)
+        for i in range(len(t_cols)):
+            game_log_table.get_celld()[(0, i)].set_facecolor('#0F172A')
+            game_log_table.get_celld()[(0, i)].get_text().set_color('#FDB827')
+            game_log_table.get_celld()[(0, i)].get_text().set_fontweight('bold')
+        for r_idx in range(len(t_data)):
+            bg = '#FFFFFF' if r_idx % 2 == 0 else '#F8FAFC'
+            for c_idx in range(len(t_cols)):
+                game_log_table.get_celld()[(r_idx + 1, c_idx)].set_facecolor(bg)
+
+        _plot_footer(ax_footer, is_lvbp=True)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            plt.tight_layout()
+        buf = io.BytesIO()
+        fig.savefig(buf, format='png', dpi=dpi, bbox_inches='tight', facecolor='white')
+        plt.close(fig)
+        return buf.getvalue()
+
+    # Modo Salida Individual ('game')
     fig = plt.figure(figsize=(20, 20), facecolor='white')
     gs = gridspec.GridSpec(
         6, 8,
