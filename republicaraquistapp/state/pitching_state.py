@@ -157,8 +157,12 @@ class PitchingState(AppState):
         finally:
             self.is_searching = False
 
-    def select_pitcher_by_id(self, pitcher_id: int, prefer_branch: Optional[str] = None):
-        """Selecciona un lanzador, extrae su historial y carga sus juegos."""
+    def select_pitcher_by_id(self, pitcher_id: int):
+        """Selecciona un lanzador, extrae su historial y carga sus juegos (manejador de eventos UI)."""
+        self._select_pitcher_internal(pitcher_id)
+
+    def _select_pitcher_internal(self, pitcher_id: int, prefer_branch: Optional[str] = None):
+        """Lógica interna de selección de lanzador con soporte para prefer_branch."""
         found = None
         for p in self.search_results:
             if p.get("id") == pitcher_id:
@@ -781,7 +785,7 @@ class PitchingState(AppState):
                 p_id_int = int(p_id)
                 # Si no hay lanzador seleccionado o es uno diferente al actual, cargar el nuevo
                 if not (self.has_pitcher_selected and self.selected_pitcher.get("id") == p_id_int):
-                    self.select_pitcher_by_id(p_id_int, prefer_branch=branch_param or "lvbp")
+                    self._select_pitcher_internal(p_id_int, prefer_branch=branch_param or "lvbp")
                     return
             except (ValueError, TypeError):
                 pass
@@ -792,7 +796,7 @@ class PitchingState(AppState):
                 self.search_query = p_name
                 self.perform_search()
                 if self.search_results:
-                    self.select_pitcher_by_id(self.search_results[0]["id"], prefer_branch=branch_param or "lvbp")
+                    self._select_pitcher_internal(self.search_results[0]["id"], prefer_branch=branch_param or "lvbp")
                     return
 
         # 3. Si ya hay un lanzador seleccionado y no hay nuevos parámetros de consulta, mantener estado

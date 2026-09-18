@@ -19,7 +19,7 @@ class TestPitchingState(unittest.TestCase):
     """Pruebas del estado reactivo de Pitching Summary."""
 
     def setUp(self):
-        self.state = PitchingState()
+        self.state = PitchingState(_reflex_internal_init=True)
         self.state.clear_selection()
 
     def test_select_caracas_pitcher_by_id(self):
