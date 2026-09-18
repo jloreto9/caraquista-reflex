@@ -13,6 +13,12 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
     networks:
       - root_default
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f --connect-timeout 5 --max-time 10 http://localhost:3000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.caraquista.rule=Host(`caraquista.srv929207.hstgr.cloud`)"

@@ -21,3 +21,20 @@
 
 ### 5. Política de Base de Datos (Zero Bloat)
 - La data Statcast de MLB/MiLB descargada debe almacenarse exclusivamente en caché local Parquet (`.cache/statcast/`) y nunca ocupar espacio ni tablas en Supabase.
+
+## Políticas de Red y Prevención de Bloqueos (Curls & Timeouts)
+
+### 1. Requisito Innegociable de Timeouts en `curl`
+- **Nunca ejecutar `curl` sin límites de tiempo:** En shells, scripts `.sh` / `.bat`, Dockerfiles, workflows de CI/CD y healthchecks de contenedores, la invocación de `curl` sin banderas de timeout corre el riesgo de congelar el proceso indefinidamente si la conexión se bloquea o el servidor no responde ("fatal").
+- **Tupla obligatoria de banderas en `curl`:**
+  - En comprobaciones de salud o verificaciones de endpoints: `curl -f --connect-timeout 5 --max-time 15 ...`
+  - En descargas e instalaciones en Dockerfile o scripts de setup: `curl -fsSL --connect-timeout 15 --max-time 120 --retry 3 --retry-delay 2 ...`
+  - En verificaciones rápidas por CLI / PowerShell: `curl.exe -sS -I --connect-timeout 5 -m 10 ...`
+
+### 2. Timeouts en Peticiones HTTP y Sockets en Python
+- Todas las peticiones con `requests` o `urllib.request` deben declarar un argumento `timeout=` explícito (ej: `timeout=15` o `timeout=30`).
+- Para blindar librerías de terceros que internamente abren sockets sin timeouts parametrizables (como `pybaseball` o clientes de APIs), debe definirse un timeout por defecto a nivel de socket del sistema operativo al inicio del proceso:
+  ```python
+  import socket
+  socket.setdefaulttimeout(30.0)
+  ```

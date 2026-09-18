@@ -13,8 +13,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Install bun runtime
-RUN curl -fsSL https://bun.sh/install | bash
+# Install bun runtime with bounded connection and execution timeouts
+RUN curl -fsSL --connect-timeout 15 --max-time 120 --retry 3 --retry-delay 2 https://bun.sh/install | bash
 ENV PATH="/root/.bun/bin:${PATH}"
 
 # Install Python dependencies

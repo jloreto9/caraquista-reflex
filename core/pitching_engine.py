@@ -16,11 +16,15 @@ Soporta:
 import os
 import json
 import time
+import socket
 import urllib.parse
 import urllib.request
 import pandas as pd
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime
+
+# Timeout global de socket (30s) para evitar bloqueos por bibliotecas de terceros (ej: pybaseball)
+socket.setdefaulttimeout(30.0)
 
 from core.cache import cache_ttl
 from core.teams import LVBP_TEAMS, get_team_abbr, get_team_name, get_team_logo

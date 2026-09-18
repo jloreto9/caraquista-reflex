@@ -7,6 +7,10 @@ Registra las 8 rutas de la Single Page Application (SPA) con sus respectivos
 títulos, favicons y manejadores reactivos on_load.
 """
 
+import socket
+# Blindaje global: evitar que requests o sockets queden colgados indefinidamente
+socket.setdefaulttimeout(30.0)
+
 import reflex as rx
 from rxconfig import config
 

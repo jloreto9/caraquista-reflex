@@ -1,4 +1,4 @@
-﻿name: Ingesta Diaria LVBP (Batch ETL)
+name: Ingesta Diaria LVBP (Batch ETL)
 
 on:
   schedule:
@@ -54,4 +54,4 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: |
-          python -c "import os, requests; url = os.environ.get('SUPABASE_URL'); key = os.environ.get('SUPABASE_KEY'); requests.get(f'{url}/rest/v1/teams?select=id&limit=1', headers={'apikey': key, 'Authorization': f'Bearer {key}'}) if url and key else None; print('Ping Keep-Alive ejecutado con éxito.')"
+          python -c "import os, requests; url = os.environ.get('SUPABASE_URL'); key = os.environ.get('SUPABASE_KEY'); requests.get(f'{url}/rest/v1/teams?select=id&limit=1', headers={'apikey': key, 'Authorization': f'Bearer {key}'}, timeout=15) if url and key else None; print('Ping Keep-Alive ejecutado con éxito.')"
