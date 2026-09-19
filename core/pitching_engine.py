@@ -336,8 +336,33 @@ def get_pitcher_game_logs(pitcher_id: int, season: int, is_lvbp: bool = False) -
 
 
 def _get_lvbp_pitcher_game_logs(pitcher_id: int, season: int) -> List[Dict[str, Any]]:
-    """Obtiene salidas de LVBP desde Supabase con fallback a caché local."""
+    """Obtiene salidas de LVBP desde Supabase con fallback a caché local y API oficial MLB."""
     logs: List[Dict[str, Any]] = []
+
+    # Mapa oficial de rol abridor / relevista y datos vía MLB Stats API (sportId=17)
+    starter_map: Dict[Any, bool] = {}
+    splits_fallback: List[Dict[str, Any]] = []
+    try:
+        api_url = (
+            f"https://statsapi.mlb.com/api/v1/people/{pitcher_id}/stats"
+            f"?stats=gameLog&group=pitching&season={season}&sportId=17&gameType=R,F,D,L,W"
+        )
+        req = urllib.request.Request(api_url, headers=HEADERS)
+        with urllib.request.urlopen(req, timeout=6) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            stats = data.get("stats", [])
+            if stats:
+                splits_fallback = stats[0].get("splits", [])
+                for s in splits_fallback:
+                    g_pk = s.get("game", {}).get("gamePk")
+                    dt = s.get("date")
+                    gs = s.get("stat", {}).get("gamesStarted", 0) > 0
+                    if g_pk:
+                        starter_map[g_pk] = gs
+                    if dt:
+                        starter_map[dt] = gs
+    except Exception:
+        pass
 
     # 1. Intentar consultar Supabase
     try:
@@ -356,30 +381,48 @@ def _get_lvbp_pitcher_game_logs(pitcher_id: int, season: int) -> List[Dict[str, 
                 team_id = row.get("team_id")
                 opp_id = game.get("away_team_id") if game.get("home_team_id") == team_id else game.get("home_team_id")
                 opp_name = get_team_name(opp_id) if opp_id else "Rival"
-                is_start = bool(row.get("is_starter", False) or row.get("games_started", 0) > 0)
                 ip = row.get("ip_string") or str(row.get("innings_pitched", "0.0"))
+                h = int(row.get("h", 0) or 0)
+                r = int(row.get("r", 0) or 0)
+                er = int(row.get("er", 0) or 0)
+                bb = int(row.get("bb", 0) or 0)
+                so = int(row.get("so", 0) or 0)
+                pitches = int(row.get("pitches_thrown", 0) or 0)
+
+                # Filtrar salidas fantasma (jugador en roster pero que no lanzó ningún inning ni pitcheo)
+                if str(ip).strip() in ("0.0", "0", "") and h == 0 and r == 0 and er == 0 and bb == 0 and so == 0 and pitches == 0:
+                    continue
+
+                g_date = game.get("game_date", "")
+                if gid in starter_map:
+                    is_start = starter_map[gid]
+                elif g_date in starter_map:
+                    is_start = starter_map[g_date]
+                else:
+                    is_start = bool(row.get("is_starter", False) or row.get("games_started", 0) > 0)
 
                 logs.append({
                     "game_pk": gid,
-                    "date": game.get("game_date", ""),
+                    "date": g_date,
                     "opponent": opp_name,
                     "is_starter": is_start,
                     "role": "Abridor" if is_start else "Relevista",
                     "ip": ip,
-                    "h": row.get("h", 0),
-                    "r": row.get("r", 0),
-                    "er": row.get("er", 0),
-                    "bb": row.get("bb", 0),
-                    "so": row.get("so", 0),
-                    "hr": row.get("hr", 0),
-                    "pitches": row.get("pitches_thrown", 0),
-                    "strikes": row.get("strikes", 0),
+                    "h": h,
+                    "r": r,
+                    "er": er,
+                    "bb": bb,
+                    "so": so,
+                    "hr": int(row.get("hr", 0) or 0),
+                    "pitches": pitches,
+                    "strikes": int(row.get("strikes", 0) or 0),
                     "era": str(row.get("era") or "0.00"),
                     "decision": "W" if row.get("wins", 0) > 0 else ("L" if row.get("losses", 0) > 0 else ("SV" if row.get("saves", 0) > 0 else "")),
                     "league": "LVBP",
                 })
-            logs.sort(key=lambda x: x["date"], reverse=True)
-            return logs
+            if logs:
+                logs.sort(key=lambda x: x["date"], reverse=True)
+                return logs
     except Exception:
         pass
 
@@ -403,29 +446,78 @@ def _get_lvbp_pitcher_game_logs(pitcher_id: int, season: int) -> List[Dict[str, 
                         game = games_map.get(gid, {})
                         opp_id = game.get("away_team_id") if game.get("home_team_id") == row.get("team_id") else game.get("home_team_id")
                         opp_name = teams_map.get(opp_id, LVBP_TEAMS.get(opp_id, "Rival"))
-                        is_start = bool(row.get("is_starter", False) or row.get("games_started", 0) > 0)
+                        ip = str(row.get("innings_pitched", "0.0"))
+                        h = int(row.get("hits", 0) or 0)
+                        r = int(row.get("runs", 0) or 0)
+                        er = int(row.get("earned_runs", 0) or 0)
+                        bb = int(row.get("walks", row.get("base_on_balls", 0)) or 0)
+                        so = int(row.get("strikeouts", 0) or 0)
+                        pitches = int(row.get("pitches_thrown", row.get("number_of_pitches", 0)) or 0)
+
+                        if str(ip).strip() in ("0.0", "0", "") and h == 0 and r == 0 and er == 0 and bb == 0 and so == 0 and pitches == 0:
+                            continue
+
+                        g_date = game.get("game_date", "")
+                        if gid in starter_map:
+                            is_start = starter_map[gid]
+                        elif g_date in starter_map:
+                            is_start = starter_map[g_date]
+                        else:
+                            is_start = bool(row.get("is_starter", False) or row.get("games_started", 0) > 0)
 
                         logs.append({
                             "game_pk": gid,
-                            "date": game.get("game_date", ""),
+                            "date": g_date,
                             "opponent": opp_name,
                             "is_starter": is_start,
                             "role": "Abridor" if is_start else "Relevista",
-                            "ip": str(row.get("innings_pitched", "0.0")),
-                            "h": row.get("hits", 0),
-                            "r": row.get("runs", 0),
-                            "er": row.get("earned_runs", 0),
-                            "bb": row.get("walks", row.get("base_on_balls", 0)),
-                            "so": row.get("strikeouts", 0),
-                            "hr": row.get("home_runs", 0),
-                            "pitches": row.get("pitches_thrown", row.get("number_of_pitches", 0)),
-                            "strikes": row.get("strikes", 0),
+                            "ip": ip,
+                            "h": h,
+                            "r": r,
+                            "er": er,
+                            "bb": bb,
+                            "so": so,
+                            "hr": int(row.get("home_runs", 0) or 0),
+                            "pitches": pitches,
+                            "strikes": int(row.get("strikes", 0) or 0),
                             "era": str(row.get("era", "0.00")),
                             "decision": "W" if row.get("wins", 0) > 0 else ("L" if row.get("losses", 0) > 0 else ("SV" if row.get("saves", 0) > 0 else "")),
                             "league": "LVBP",
                         })
+            if logs:
+                logs.sort(key=lambda x: x["date"], reverse=True)
+                return logs
         except Exception:
             pass
+
+    # 3. Fallback directo a los splits de MLB Stats API si no hay Supabase ni caché
+    if splits_fallback:
+        for s in splits_fallback:
+            game = s.get("game", {})
+            stat = s.get("stat", {})
+            opp = s.get("opponent", {}).get("name", "Rival")
+            date_str = s.get("date", "")
+            gpk = game.get("gamePk", 0)
+            is_start = stat.get("gamesStarted", 0) > 0
+            logs.append({
+                "game_pk": gpk,
+                "date": date_str,
+                "opponent": opp,
+                "is_starter": is_start,
+                "role": "Abridor" if is_start else "Relevista",
+                "ip": stat.get("inningsPitched", "0.0"),
+                "h": stat.get("hits", 0),
+                "r": stat.get("runs", 0),
+                "er": stat.get("earnedRuns", 0),
+                "bb": stat.get("baseOnBalls", 0),
+                "so": stat.get("strikeOuts", 0),
+                "hr": stat.get("homeRuns", 0),
+                "pitches": stat.get("numberOfPitches", 0),
+                "strikes": stat.get("strikes", 0),
+                "era": stat.get("era", "0.00"),
+                "decision": _parse_decision(stat),
+                "league": "LVBP",
+            })
 
     logs.sort(key=lambda x: x["date"], reverse=True)
     return logs
@@ -550,9 +642,29 @@ def get_game_pitch_data(game_pk: int, pitcher_id: int, is_lvbp: bool = False) ->
     # 4. Splits LHB vs RHB
     splits_platoon = _build_platoon_splits(parsed_pitches)
 
+    # Detectar rol abridor / relevista desde el boxscore oficial
+    is_starter = False
+    try:
+        boxscore = data.get("liveData", {}).get("boxscore", {})
+        teams_box = boxscore.get("teams", {})
+        home_p = teams_box.get("home", {}).get("pitchers", [])
+        away_p = teams_box.get("away", {}).get("pitchers", [])
+        if (home_p and home_p[0] == pitcher_id) or (away_p and away_p[0] == pitcher_id):
+            is_starter = True
+        else:
+            for side in ("home", "away"):
+                p_obj = teams_box.get(side, {}).get("players", {}).get(f"ID{pitcher_id}", {})
+                if p_obj.get("stats", {}).get("pitching", {}).get("gamesStarted", 0) > 0:
+                    is_starter = True
+                    break
+    except Exception:
+        pass
+
     return {
         "game_pk": game_pk,
         "pitcher_id": pitcher_id,
+        "is_starter": is_starter,
+        "role": "Abridor" if is_starter else "Relevista",
         "total_pitches": len(parsed_pitches),
         "has_statcast": has_statcast,
         "statcast_table": statcast_table,

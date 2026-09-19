@@ -604,12 +604,6 @@ def _plot_footer(ax: plt.Axes, is_lvbp: bool = False):
     ax.text(0.0, 0.72, 'República Caraquista', ha='left', va='center', fontsize=18, fontweight='bold', color='#070B19')
     ax.text(0.0, 0.28, '@republicaraquista • Jorge Leonardo Loreto', ha='left', va='center', fontsize=13, color='#64748B')
 
-    # Centro: Explicación de colores o metodología
-    if not is_lvbp:
-        ax.text(0.5, 0.50, 'Colour Coding Compares to League Average By Pitch', ha='center', va='center', fontsize=14, color='#475569', fontstyle='italic')
-    else:
-        ax.text(0.5, 0.50, 'Play-by-Play Sabermétrico • Tango RE24 Leverage Index', ha='center', va='center', fontsize=14, color='#475569', fontstyle='italic')
-
     # Derecha: Créditos y Fuentes
     ax.text(1.0, 0.72, 'Diseño inspirado en Thomas Nestico (@TJStats)', ha='right', va='center', fontsize=14, fontweight='bold', color='#070B19')
     src_data = 'Data: MLB Stats API / Gameday PBP' if is_lvbp else 'Data: MLB Statcast / Baseball Savant'
@@ -842,6 +836,9 @@ def build_lvbp_matplotlib_summary(
                         g['strikes'] = strk
                         g['csw_pct'] = csw
                         g['whiff_pct'] = whiff
+                        if 'is_starter' in p_data and p_data.get('is_starter') is not None:
+                            g['is_starter'] = p_data['is_starter']
+                            g['role'] = 'Abridor' if p_data['is_starter'] else 'Relevista'
                     except Exception:
                         pass
                 return g
@@ -1001,7 +998,7 @@ def build_lvbp_matplotlib_summary(
             t_data.append([
                 _fmt_date_short(g.get('date', '')),
                 _clean_team_name(g.get('opponent', 'Rival')),
-                str(g.get('role', 'Abridor'))[:8],
+                str(g.get('role', 'Abridor')),
                 str(g.get('decision', '—') or '—'),
                 str(g.get('ip', '0.0')),
                 str(g.get('h', 0)),
