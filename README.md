@@ -102,6 +102,15 @@ La plataforma cuenta con 9 módulos analíticos independientes y especializados:
 - **Control de Corredores Heredados:** Corredores heredados ($IR$), corredores anotados ($IRS$) y tasa de prevención ($IRS\%$).
 - **Matriz de Calor de Alineaciones 1-9:** Desglose del aporte ofensivo según el turno al bate y récord del equipo con alineaciones titulares específicas.
 
+### 9. 🔥 Pitching Summary & Telemetría Nestico (`/pitching`)
+- **Buscador Universal Multiliga:** Búsqueda en tiempo real de lanzadores cubriendo Leones del Caracas (LVBP), Liga Mexicana de Béisbol (LMB Verano, `sportId=23`) y MLB/MiLB.
+- **Filtro Reactivo por Fases:** Desglose por *Temporada Regular*, *Round Robin*, *Serie Final*, *Postemporada* y *Todas las Fases*.
+- **Historial de Salidas & Decisiones:** Detección automática del rol (*Abridor* / *Relevista*) y decisión oficial (*W*, *L*, *SV*, *HLD*), métricas de dominio ($IP$, $H$, $CL$, $BB$, $K$) y telemetría de lanzamientos (P-S, $CSW\%$, $Whiff\%$).
+- **Tarjeta de Exportación Gráfica HD (2400 x 2400 px a 300 DPI):**
+  - Formato vertical de póster sabermétrico unificado inspirado en Thomas Nestico (@TJStats).
+  - **Rama LVBP / LMB:** Gráficos de carga por episodio (Strikes vs Bolas apiladas), índice de apalancamiento Leverage Index (Tango RE24), splits LHB/RHB y tabla histórica de salidas.
+  - **Rama MLB / MiLB:** Telemetría Hawk-Eye completa, ridgeplots de velocidad, quiebre inducido (iVB vs HB), evolución de repertorio (5-Game Rolling Usage) y matriz de repertorio con mapas de calor relativos a MLB.
+
 ---
 
 ## 🛠️ Stack Tecnológico y Arquitectura

@@ -347,6 +347,10 @@ def get_pitcher_game_logs(
                     date_str = str(s.get("date") or "")
                     gpk = game.get("gamePk", 0)
                     is_start = _safe_int(stat.get("gamesStarted")) > 0
+                    g_type = s.get("gameType") or "R"
+
+                    if phase and phase != "all" and g_type != phase:
+                        continue
 
                     logs.append({
                         "game_pk": gpk,
@@ -354,6 +358,8 @@ def get_pitcher_game_logs(
                         "opponent": opp,
                         "is_starter": is_start,
                         "role": "Abridor" if is_start else "Relevista",
+                        "game_type": g_type,
+                        "phase": g_type,
                         "ip": stat.get("inningsPitched", "0.0"),
                         "h": stat.get("hits", 0),
                         "r": stat.get("runs", 0),
@@ -658,6 +664,7 @@ def _get_mexico_pitcher_game_logs(pitcher_id: int, season: int, phase: str = "al
             stats = data.get("stats", [])
             if stats:
                 splits = stats[0].get("splits", [])
+                seen_pks = set()
                 for s in splits:
                     game = s.get("game", {})
                     stat = s.get("stat", {})
@@ -667,12 +674,21 @@ def _get_mexico_pitcher_game_logs(pitcher_id: int, season: int, phase: str = "al
                     gpk = game.get("gamePk", 0)
                     g_type = s.get("gameType") or "R"
 
+                    # Deduplicación por gamePk (o fecha si gpk es 0)
+                    dedup_key = gpk if gpk else date_str
+                    if dedup_key and dedup_key in seen_pks:
+                        continue
+
                     # Filtrar por fase si no es 'all'
+                    # En México: 'R' = Temporada Regular, 'P'/'L'/'F' = Playoffs/Postemporada (P, D, L, F, W)
                     if phase and phase != "all":
                         if phase == "R" and g_type != "R":
                             continue
                         elif phase in ("P", "L", "F") and g_type not in ("P", "L", "F", "D", "W") and g_type != phase:
                             continue
+
+                    if dedup_key:
+                        seen_pks.add(dedup_key)
 
                     is_start = _safe_int(stat.get("gamesStarted")) > 0
                     p_cnt = int(stat.get("numberOfPitches", 0) or 0)

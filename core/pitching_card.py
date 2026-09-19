@@ -40,7 +40,7 @@ import numpy as np
 from PIL import Image
 
 # ── Compatibilidad con la suite de pruebas previa ─────────────────────────────
-CANVAS_SIZE = (2400, 1350)
+CANVAS_SIZE = (2400, 2400)
 CANVAS_SIZE_LVBP = (2400, 2400)
 DPI = (300, 300)
 
@@ -124,9 +124,83 @@ TABLE_COLUMNS = [
 
 BASELINES_CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)), "statcast_2024_grouped.csv")
 LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "logo.png")
+if not os.path.exists(LOGO_PATH):
+    LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logo.png")
 
 
 # ── 1. Funciones Auxiliares de Agrupación y Color ─────────────────────────────
+
+def _clean_team_name(t_name: str) -> str:
+    """Normaliza nombres de franquicias de LVBP y LMB México con soporte para variantes con o sin tildes."""
+    t = str(t_name or "").replace("vs ", "").strip()
+    subs = {
+        # LVBP
+        "Navegantes del Magallanes": "Magallanes",
+        "Leones del Caracas": "Caracas",
+        "Tiburones de La Guaira": "La Guaira",
+        "Tigres de Aragua": "Aragua",
+        "Cardenales de Lara": "Lara",
+        "Águilas del Zulia": "Zulia",
+        "Aguilas del Zulia": "Zulia",
+        "Caribes de Anzoátegui": "Caribes",
+        "Caribes de Anzoategui": "Caribes",
+        "Bravos de Margarita": "Bravos",
+        # LMB México
+        "Diablos Rojos del México": "Diablos Rojos",
+        "Diablos Rojos del Mexico": "Diablos Rojos",
+        "Tecolotes de los Dos Laredos": "Tecolotes",
+        "Pericos de Puebla": "Pericos",
+        "Tigres de Quintana Roo": "Tigres QR",
+        "Piratas de Campeche": "Piratas",
+        "El Águila de Veracruz": "El Águila",
+        "El Aguila de Veracruz": "El Águila",
+        "Conspiradores de Querétaro": "Conspiradores",
+        "Conspiradores de Queretaro": "Conspiradores",
+        "Saraperos de Saltillo": "Saraperos",
+        "Dorados de Chihuahua": "Dorados",
+        "Algodoneros del Unión Laguna": "Algodoneros",
+        "Algodoneros del Union Laguna": "Algodoneros",
+        "Algodoneros Union Laguna": "Algodoneros",
+        "Olmecas de Tabasco": "Olmecas",
+        "Leones de Yucatán": "Leones YUC",
+        "Leones de Yucatan": "Leones YUC",
+        "Guerreros de Oaxaca": "Guerreros",
+        "Acereros de Monclova": "Acereros",
+        "Sultanes de Monterrey": "Sultanes",
+        "Toros de Tijuana": "Toros TIJ",
+        "Rieleros de Aguascalientes": "Rieleros",
+        "Charros de Jalisco": "Charros",
+        "Caliente de Durango": "Caliente",
+        "Bravos de León": "Bravos LEO",
+        "Bravos de Leon": "Bravos LEO",
+    }
+    return subs.get(t, t[:14])
+
+
+def _fmt_date_short(d_str: str) -> str:
+    """Convierte fecha YYYY-MM-DD a formato DD/MM/YY."""
+    parts = str(d_str or "").split('-')
+    if len(parts) == 3:
+        return f"{parts[2]}/{parts[1]}/{parts[0][2:]}"
+    return str(d_str)
+
+
+def _ip_str_to_outs(ip_val: Any) -> int:
+    """Convierte '5.2' a 17 outs, o 5.0 a 15 outs."""
+    try:
+        s = str(ip_val).strip()
+        if '.' in s:
+            parts = s.split('.')
+            return int(parts[0]) * 3 + int(parts[1])
+        return int(float(s)) * 3
+    except Exception:
+        return 0
+
+
+def _outs_to_ip_str(outs: int) -> str:
+    """Convierte 17 outs a '5.2'."""
+    return f"{outs // 3}.{outs % 3}"
+
 
 def _load_statcast_group() -> pd.DataFrame:
     if os.path.exists(BASELINES_CSV):
@@ -621,6 +695,7 @@ def build_nestico_pitching_summary(
     end_date: Optional[str] = None,
     game_summary: Optional[Dict[str, Any]] = None,
     stats_data: Optional[Dict[str, Any]] = None,
+    game_logs: Optional[List[Dict[str, Any]]] = None,
     dpi: int = 180,
 ) -> bytes:
     """
@@ -662,7 +737,7 @@ def build_nestico_pitching_summary(
 
     # Subtítulos según modo
     if mode == "game":
-        opp = (game_summary or {}).get("opponent", "Rival")
+        opp = _clean_team_name((game_summary or {}).get("opponent", "Rival"))
         dt = (game_summary or {}).get("date", "")
         sub1 = f"Salida Individual vs {opp}"
         sub2 = f"Fecha: {dt}"
@@ -681,7 +756,10 @@ def build_nestico_pitching_summary(
     _plot_logo(ax_logo)
 
     # Tabla resumen de métricas
-    _calc_and_plot_summary_table(ax_season_table, df, mode, stats_data, game_summary)
+    _calc_and_plot_summary_table(
+        ax_season_table, df, mode, stats_data, game_summary,
+        game_logs=game_logs, start_date=start_date, end_date=end_date
+    )
 
     # Panel triple
     _plot_velocity_kdes(df, ax_plot_1, gs_plots[0, 0], fig, df_statcast_group)
@@ -708,7 +786,16 @@ def build_nestico_pitching_summary(
     return buf.getvalue()
 
 
-def _calc_and_plot_summary_table(ax: plt.Axes, df: pd.DataFrame, mode: str, stats_data: Optional[Dict[str, Any]], game_summary: Optional[Dict[str, Any]]):
+def _calc_and_plot_summary_table(
+    ax: plt.Axes,
+    df: pd.DataFrame,
+    mode: str,
+    stats_data: Optional[Dict[str, Any]],
+    game_summary: Optional[Dict[str, Any]],
+    game_logs: Optional[List[Dict[str, Any]]] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+):
     """Calcula o formatea las estadísticas para la barra resumen."""
     if mode == "game" and game_summary:
         st = {
@@ -733,12 +820,35 @@ def _calc_and_plot_summary_table(ax: plt.Axes, df: pd.DataFrame, mode: str, stat
         bb_pct = f"{round(bb / max(1, tbf) * 100.0, 1)}%"
         k_bb = f"{round((so - bb) / max(1, tbf) * 100.0, 1)}%"
 
+        calc_whip = (stats_data or {}).get('whip', '—')
+        calc_era = (stats_data or {}).get('era', '—')
+        calc_fip = (stats_data or {}).get('fip', '—')
+        calc_ip = (stats_data or {}).get('ip')
+
+        if game_logs and (calc_whip in (None, '—') or calc_era in (None, '—')):
+            m_logs = list(game_logs)
+            if mode == "range" and start_date and end_date:
+                m_logs = [g for g in m_logs if str(start_date) <= str(g.get("date", "")) <= str(end_date)]
+            if m_logs:
+                tot_outs = sum(_ip_str_to_outs(g.get("ip", "0.0")) for g in m_logs)
+                float_ip = tot_outs / 3.0
+                tot_er = sum(int(g.get("er") or 0) for g in m_logs)
+                tot_bb = sum(int(g.get("bb") or 0) for g in m_logs)
+                tot_h = sum(int(g.get("h") or 0) for g in m_logs)
+                tot_so = sum(int(g.get("so") or 0) for g in m_logs)
+                tot_hr = sum(int(g.get("hr") or 0) for g in m_logs)
+                if float_ip > 0:
+                    calc_era = f"{(tot_er * 9.0 / float_ip):.2f}"
+                    calc_whip = f"{((tot_bb + tot_h) / float_ip):.2f}"
+                    calc_fip = f"{(((13 * tot_hr + 3 * tot_bb - 2 * tot_so) / float_ip) + 3.10):.2f}"
+                    calc_ip = f"{tot_outs // 3}.{tot_outs % 3}"
+
         st = {
-            'ip': (stats_data or {}).get('ip', f"{tot_pitches // 15}.0"),
+            'ip': calc_ip or (stats_data or {}).get('ip', f"{tot_pitches // 15}.0"),
             'pa': (stats_data or {}).get('tbf', tbf),
-            'whip': (stats_data or {}).get('whip', '—'),
-            'era': (stats_data or {}).get('era', '—'),
-            'fip': (stats_data or {}).get('fip', '—'),
+            'whip': calc_whip,
+            'era': calc_era,
+            'fip': calc_fip,
             'k_pct': (stats_data or {}).get('k_pct', k_pct),
             'bb_pct': (stats_data or {}).get('bb_pct', bb_pct),
             'k_bb_pct': (stats_data or {}).get('k_bb_pct', k_bb),
@@ -754,23 +864,6 @@ def _calc_csw_pct(df: pd.DataFrame) -> str:
 
 
 # ── 4. Soporte Adaptativo para Leones del Caracas (LVBP) ──────────────────────
-
-def _ip_str_to_outs(ip_val: Any) -> int:
-    """Convierte '5.2' a 17 outs, o 5.0 a 15 outs."""
-    try:
-        s = str(ip_val).strip()
-        if '.' in s:
-            parts = s.split('.')
-            return int(parts[0]) * 3 + int(parts[1])
-        return int(float(s)) * 3
-    except Exception:
-        return 0
-
-
-def _outs_to_ip_str(outs: int) -> str:
-    """Convierte 17 outs a '5.2'."""
-    return f"{outs // 3}.{outs % 3}"
-
 
 def build_lvbp_matplotlib_summary(
     pitcher_info: Dict[str, Any],
@@ -796,7 +889,19 @@ def build_lvbp_matplotlib_summary(
     # Si es modo temporada completa o rango de fechas
     if mode in ("season", "range"):
         logs = list(game_logs or [])
-        team_label = pitcher_info.get("team") if is_mexico else (pitcher_info.get("lvbp_team_name") or pitcher_info.get("team") or "Leones del Caracas")
+        if is_mexico:
+            mex_team = None
+            if logs:
+                teams = [g.get("team") for g in logs if g.get("team") and g.get("team") not in ("Liga Mexicana", "Rival")]
+                if teams:
+                    mex_team = max(set(teams), key=teams.count)
+            if not mex_team and game_summary:
+                mex_team = game_summary.get("team")
+            if not mex_team:
+                mex_team = pitcher_info.get("team") or "Diablos Rojos"
+            team_label = _clean_team_name(mex_team)
+        else:
+            team_label = pitcher_info.get("lvbp_team_name") or pitcher_info.get("team") or "Leones del Caracas"
 
         if is_mexico:
             phase_labels = {
@@ -852,9 +957,9 @@ def build_lvbp_matplotlib_summary(
                 if gpk and (g.get('csw_pct') is None or g.get('whiff_pct') is None or not g.get('pitches')):
                     try:
                         try:
-                            from core.pitching_engine import get_game_pitch_data
-                        except ImportError:
                             from utils.pitching_engine import get_game_pitch_data
+                        except ImportError:
+                            from core.pitching_engine import get_game_pitch_data
                         p_data = get_game_pitch_data(gpk, p_id_int, is_lvbp=True)
                         kpis = p_data.get('pbp_kpis', {})
                         tot_p = g.get('pitches') or p_data.get('total_pitches', 0)
@@ -998,48 +1103,6 @@ def build_lvbp_matplotlib_summary(
         ax_table.axis('off')
         display_logs = sorted_logs[::-1][:8]
 
-        def _clean_team_name(t_name: str) -> str:
-            t = str(t_name).replace("vs ", "").strip()
-            subs = {
-                # LVBP
-                "Navegantes del Magallanes": "Magallanes",
-                "Leones del Caracas": "Caracas",
-                "Tiburones de La Guaira": "La Guaira",
-                "Tigres de Aragua": "Aragua",
-                "Cardenales de Lara": "Lara",
-                "Águilas del Zulia": "Zulia",
-                "Caribes de Anzoátegui": "Caribes",
-                "Bravos de Margarita": "Bravos",
-                # LMB México
-                "Diablos Rojos del México": "Diablos Rojos",
-                "Tecolotes de los Dos Laredos": "Tecolotes",
-                "Pericos de Puebla": "Pericos",
-                "Tigres de Quintana Roo": "Tigres QR",
-                "Piratas de Campeche": "Piratas",
-                "El Águila de Veracruz": "El Águila",
-                "Conspiradores de Querétaro": "Conspiradores",
-                "Saraperos de Saltillo": "Saraperos",
-                "Dorados de Chihuahua": "Dorados",
-                "Algodoneros del Unión Laguna": "Algodoneros",
-                "Olmecas de Tabasco": "Olmecas",
-                "Leones de Yucatán": "Leones YUC",
-                "Guerreros de Oaxaca": "Guerreros",
-                "Acereros de Monclova": "Acereros",
-                "Sultanes de Monterrey": "Sultanes",
-                "Toros de Tijuana": "Toros TIJ",
-                "Rieleros de Aguascalientes": "Rieleros",
-                "Charros de Jalisco": "Charros",
-                "Caliente de Durango": "Caliente",
-                "Bravos de León": "Bravos LEO",
-            }
-            return subs.get(t, t[:14])
-
-        def _fmt_date_short(d_str: str) -> str:
-            parts = str(d_str).split('-')
-            if len(parts) == 3:
-                return f"{parts[2]}/{parts[1]}/{parts[0][2:]}"
-            return str(d_str)
-
         t_data = []
         for g in display_logs:
             p_val = int(g.get('pitches') or 0)
@@ -1111,9 +1174,21 @@ def build_lvbp_matplotlib_summary(
     ax_table = fig.add_subplot(gs[4, 1:7])
     ax_footer = fig.add_subplot(gs[-1, 1:7])
 
-    opp = game_summary.get("opponent", "Rival")
+    opp = _clean_team_name(game_summary.get("opponent", "Rival"))
     dt = game_summary.get("date", "")
-    team_label = pitcher_info.get("team") if is_mexico else (pitcher_info.get("lvbp_team_name") or pitcher_info.get("team") or "Leones del Caracas")
+    if is_mexico:
+        mex_team = game_summary.get("team")
+        if not mex_team or mex_team in ("Liga Mexicana", "Rival"):
+            if game_logs:
+                teams = [g.get("team") for g in game_logs if g.get("team") and g.get("team") not in ("Liga Mexicana", "Rival")]
+                if teams:
+                    mex_team = max(set(teams), key=teams.count)
+        if not mex_team:
+            mex_team = pitcher_info.get("team") or "Diablos Rojos"
+        team_label = _clean_team_name(mex_team)
+    else:
+        team_label = pitcher_info.get("lvbp_team_name") or pitcher_info.get("team") or "Leones del Caracas"
+
     _plot_headshot(ax_headshot, pitcher_info.get("photo_url"))
     league_title = "México" if is_mexico else "LVBP"
     season_prefix = "LMB Verano " if is_mexico else "Temporada "
@@ -1274,14 +1349,14 @@ def build_pitching_summary_card(
     game_logs: Optional[List[Dict[str, Any]]] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
+    phase: str = "all",
     df_statcast: Optional[pd.DataFrame] = None,
     df: Optional[pd.DataFrame] = None,
     dpi: int = 150,
-    phase: str = "all",
     **kwargs,
 ) -> bytes:
     """
-    Función de compatibilidad universal para generación de tarjetas HD (2400x2400 para LVBP/México, 2400x1350 para MLB a 300 DPI).
+    Función de compatibilidad universal para generación de tarjetas HD (2400x1350 px a 300 DPI).
     Admite indistintamente (pitcher_info / pitcher_data), (game_summary / game_data),
     (analysis / pitch_analysis), modos de tiempo ('game', 'season', 'range') y DataFrames Statcast.
     """
@@ -1289,6 +1364,7 @@ def build_pitching_summary_card(
     g_data = game_summary or game_data or {}
     p_analysis = analysis or pitch_analysis or {}
     statcast_df = df if df is not None else df_statcast
+    phase_arg = phase or kwargs.get("phase", "all")
     use_mexico = is_mexico or (branch == "mexico")
 
     if is_lvbp or use_mexico or branch == "lvbp":
@@ -1302,7 +1378,7 @@ def build_pitching_summary_card(
             start_date=start_date,
             end_date=end_date,
             game_logs=game_logs,
-            phase=phase,
+            phase=phase_arg,
             is_mexico=use_mexico,
         )
     else:
@@ -1341,13 +1417,15 @@ def build_pitching_summary_card(
             start_date=start_date,
             end_date=end_date,
             game_summary=g_data,
+            game_logs=game_logs,
             dpi=dpi,
         )
 
-    # Redimensionar al formato correspondiente (1:1 cuadrado para LVBP, 16:9 para MLB) a 300 DPI
-    target_size = CANVAS_SIZE_LVBP if is_lvbp else CANVAS_SIZE
+    # Redimensionar al formato canónico vertical (2400x2400) a 300 DPI (paridad total con LVBP)
+    target_size = CANVAS_SIZE_LVBP
     im = Image.open(io.BytesIO(raw_bytes))
     im_resized = im.resize(target_size, Image.Resampling.LANCZOS)
     out_buf = io.BytesIO()
     im_resized.save(out_buf, format="PNG", dpi=DPI)
     return out_buf.getvalue()
+
