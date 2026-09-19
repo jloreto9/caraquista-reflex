@@ -227,13 +227,6 @@ def controls_bar() -> rx.Component:
                 # Ramas
                 rx.hstack(
                     rx.button(
-                        "⚾ MLB / MiLB (Statcast)",
-                        size="2",
-                        variant=rx.cond(PitchingState.active_branch == "mlb", "solid", "outline"),
-                        color_scheme=rx.cond(PitchingState.active_branch == "mlb", "amber", "gray"),
-                        on_click=PitchingState.set_active_branch("mlb"),
-                    ),
-                    rx.button(
                         rx.cond(
                             PitchingState.has_caracas_history,
                             "🦁 Leones del Caracas (LVBP)",
@@ -244,6 +237,20 @@ def controls_bar() -> rx.Component:
                         color_scheme=rx.cond(PitchingState.active_branch == "lvbp", "amber", "gray"),
                         disabled=~PitchingState.has_lvbp_history,
                         on_click=PitchingState.set_active_branch("lvbp"),
+                    ),
+                    rx.button(
+                        "🇲🇽 México",
+                        size="2",
+                        variant=rx.cond(PitchingState.active_branch == "mexico", "solid", "outline"),
+                        color_scheme=rx.cond(PitchingState.active_branch == "mexico", "amber", "gray"),
+                        on_click=PitchingState.set_active_branch("mexico"),
+                    ),
+                    rx.button(
+                        "⚾ MLB / MiLB (Statcast)",
+                        size="2",
+                        variant=rx.cond(PitchingState.active_branch == "mlb", "solid", "outline"),
+                        color_scheme=rx.cond(PitchingState.active_branch == "mlb", "amber", "gray"),
+                        on_click=PitchingState.set_active_branch("mlb"),
                     ),
                     spacing="2",
                 ),
@@ -289,9 +296,9 @@ def controls_bar() -> rx.Component:
                     color_scheme="amber",
                     width="100px",
                 ),
-                # Selector de Fase (solo visible en LVBP)
+                # Selector de Fase (visible en LVBP y México)
                 rx.cond(
-                    PitchingState.active_branch == "lvbp",
+                    (PitchingState.active_branch == "lvbp") | (PitchingState.active_branch == "mexico"),
                     rx.hstack(
                         rx.text("Fase:", size="2", font_weight="700", color=TEXT_MUTED),
                         rx.select(

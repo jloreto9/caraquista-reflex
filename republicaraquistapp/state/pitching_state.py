@@ -231,15 +231,22 @@ class PitchingState(AppState):
             "Temporada Regular": "R",
             "Round Robin": "L",
             "Serie Final": "F",
+            "Postemporada": "P",
         }
         self.selected_phase = phase_map.get(label, "all")
         self.load_pitcher_games()
 
     def set_active_branch(self, branch: str):
-        """Cambia entre la rama MLB/MiLB (Statcast) y LVBP."""
+        """Cambia entre la rama MLB/MiLB (Statcast), México y LVBP."""
         if branch == "lvbp" and not self.has_lvbp_history:
             return
         self.active_branch = branch
+        if branch == "mexico":
+            self.available_phases = ["Todas las Fases", "Temporada Regular", "Postemporada"]
+        else:
+            self.available_phases = ["Todas las Fases", "Temporada Regular", "Round Robin", "Serie Final"]
+        self.selected_phase = "all"
+        self.selected_phase_label = "Todas las Fases"
         self.load_pitcher_games()
 
     def set_pitcher_season(self, season_val: str):
@@ -322,14 +329,26 @@ class PitchingState(AppState):
                 s_int = int(self.pitcher_season)
             except (ValueError, TypeError):
                 s_int = 2025
-            logs = get_pitcher_game_logs(p_id, s_int, is_lvbp=is_lvbp, phase=self.selected_phase)
+            logs = get_pitcher_game_logs(
+                p_id,
+                s_int,
+                is_lvbp=is_lvbp,
+                branch=self.active_branch,
+                phase=self.selected_phase,
+            )
 
             # Auto-detección inteligente: si la temporada actual no tiene salidas registradas,
             # buscar en las temporadas históricas disponibles y fijar la primera con datos.
             if not logs and self.selected_phase == "all":
                 for alt_s in [2025, 2024, 2023, 2022]:
                     if alt_s != s_int:
-                        alt_logs = get_pitcher_game_logs(p_id, alt_s, is_lvbp=is_lvbp, phase="all")
+                        alt_logs = get_pitcher_game_logs(
+                            p_id,
+                            alt_s,
+                            is_lvbp=is_lvbp,
+                            branch=self.active_branch,
+                            phase="all",
+                        )
                         if alt_logs:
                             s_int = alt_s
                             self.pitcher_season = str(alt_s)
@@ -373,7 +392,7 @@ class PitchingState(AppState):
         self.is_loading_data = True
         try:
             p_id = self.selected_pitcher.get("id")
-            is_lvbp = (self.active_branch == "lvbp")
+            is_lvbp = (self.active_branch in ("lvbp", "mexico"))
             analysis = get_game_pitch_data(self.selected_game_pk, p_id, is_lvbp=is_lvbp)
             self.pitch_analysis = analysis
             self.statcast_table = analysis.get("statcast_table", [])
@@ -382,7 +401,7 @@ class PitchingState(AppState):
 
             # Construir figuras interactivas
             pitches = analysis.get("pitches", [])
-            has_sc = analysis.get("has_statcast", False) and not is_lvbp
+            has_sc = analysis.get("has_statcast", False) and self.active_branch == "mlb"
 
             if has_sc:
                 self.fig_movement = self._build_movement_figure(pitches)
@@ -598,8 +617,9 @@ class PitchingState(AppState):
                 s_int = 2024
 
             is_lvbp = (self.active_branch == "lvbp")
+            is_mexico = (self.active_branch == "mexico")
 
-            if is_lvbp:
+            if is_lvbp or is_mexico:
                 raw_bytes = build_lvbp_matplotlib_summary(
                     pitcher_info=self.selected_pitcher,
                     game_summary=self.current_game_summary,
@@ -611,6 +631,7 @@ class PitchingState(AppState):
                     end_date=self.range_end_date,
                     game_logs=self.game_logs,
                     phase=self.selected_phase,
+                    is_mexico=is_mexico,
                 )
             else:
                 pitcher_info = dict(self.selected_pitcher)
@@ -775,9 +796,10 @@ class PitchingState(AppState):
 
         safe_name = "".join(c for c in self.selected_pitcher.get("name", "Pitcher") if c.isalnum() or c == "_").strip()
         is_lvbp = (self.active_branch == "lvbp")
-        league_tag = "LVBP" if is_lvbp else "MLB"
+        is_mexico = (self.active_branch == "mexico")
+        league_tag = "MEX" if is_mexico else ("LVBP" if is_lvbp else "MLB")
 
-        if is_lvbp or self.time_mode == "game":
+        if is_lvbp or is_mexico or self.time_mode == "game":
             date_safe = str(self.current_game_summary.get("date", "game")).replace("-", "")
             filename = f"PitchingSummary_{safe_name}_{league_tag}_{date_safe}.png"
         elif self.time_mode == "season":

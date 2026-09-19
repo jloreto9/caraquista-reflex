@@ -185,6 +185,18 @@ class TestPitchingEngine(unittest.TestCase):
         self.assertTrue(len(logs_lar) > 0)
         self.assertEqual(logs_lar[0]["league"], "LVBP")
 
+    def test_get_mexico_pitcher_game_logs_and_decisions(self):
+        """Valida que get_pitcher_game_logs con branch='mexico' extraiga salidas y decisiones (W, L, SV, HLD)."""
+        from core.pitching_engine import get_pitcher_game_logs
+
+        # Erick Leal (612797) en México 2024
+        logs_mex = get_pitcher_game_logs(612797, 2024, branch="mexico", phase="all")
+        self.assertTrue(len(logs_mex) > 0)
+        self.assertEqual(logs_mex[0]["league"], "México")
+        decisions = [g["decision"] for g in logs_mex if g.get("decision")]
+        self.assertTrue(len(decisions) > 0)
+        self.assertIn("W", decisions)
+
 
 if __name__ == "__main__":
     unittest.main()

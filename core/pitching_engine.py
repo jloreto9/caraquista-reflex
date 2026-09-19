@@ -230,7 +230,7 @@ def search_pitchers(query: str) -> List[Dict[str, Any]]:
         return [p_single] if p_single else []
 
     q = urllib.parse.quote(clean_query)
-    url = f"https://statsapi.mlb.com/api/v1/people/search?names={q}&sportIds=1,11,12,13,14,16,17"
+    url = f"https://statsapi.mlb.com/api/v1/people/search?names={q}&sportIds=1,11,12,13,14,16,17,23"
 
     results: List[Dict[str, Any]] = []
     try:
@@ -279,12 +279,21 @@ def search_pitchers(query: str) -> List[Dict[str, Any]]:
 # ── 2. Obtención de Game Logs (Salidas) ────────────────────────────────────────
 
 @cache_ttl(ttl_seconds=1800)
-def get_pitcher_game_logs(pitcher_id: int, season: int, is_lvbp: bool = False, phase: str = "all") -> List[Dict[str, Any]]:
+def get_pitcher_game_logs(
+    pitcher_id: int,
+    season: int,
+    is_lvbp: bool = False,
+    branch: str = "lvbp",
+    phase: str = "all",
+) -> List[Dict[str, Any]]:
     """
     Obtiene las salidas (Game Logs) del lanzador para la temporada especificada.
-    Si is_lvbp es True, busca en juegos de LVBP (con opción de filtrar por fase 'R', 'L', 'F', 'all'); de lo contrario en MLB y MiLB.
+    Si branch == "mexico": obtiene salidas de la Liga Mexicana de Verano (LMB, sportId=23).
+    Si is_lvbp o branch == "lvbp": busca en juegos de LVBP (con opción de filtrar por fase 'R', 'L', 'F', 'all'); de lo contrario en MLB y MiLB.
     """
-    if is_lvbp:
+    if branch == "mexico":
+        return _get_mexico_pitcher_game_logs(pitcher_id, season, phase=phase)
+    if is_lvbp or branch == "lvbp":
         return _get_lvbp_pitcher_game_logs(pitcher_id, season, phase=phase)
 
     # MLB y MiLB vía MLB Stats API
@@ -344,6 +353,7 @@ def _get_lvbp_pitcher_game_logs(pitcher_id: int, season: int, phase: str = "all"
     pitches_map: Dict[Any, int] = {}
     strikes_map: Dict[Any, int] = {}
     phase_map: Dict[Any, str] = {}
+    decision_map: Dict[Any, str] = {}
     splits_fallback: List[Dict[str, Any]] = []
     try:
         api_url = (
@@ -363,16 +373,22 @@ def _get_lvbp_pitcher_game_logs(pitcher_id: int, season: int, phase: str = "all"
                     gs = s.get("stat", {}).get("gamesStarted", 0) > 0
                     p_cnt = int(s.get("stat", {}).get("numberOfPitches", 0) or 0)
                     s_cnt = int(s.get("stat", {}).get("strikes", 0) or 0)
+                    st = s.get("stat", {})
+                    dec = _parse_decision(st)
                     if g_pk:
                         starter_map[g_pk] = gs
                         pitches_map[g_pk] = p_cnt
                         strikes_map[g_pk] = s_cnt
                         phase_map[g_pk] = gt
+                        if dec:
+                            decision_map[g_pk] = dec
                     if dt:
                         starter_map[dt] = gs
                         pitches_map[dt] = p_cnt
                         strikes_map[dt] = s_cnt
                         phase_map[dt] = gt
+                        if dec:
+                            decision_map[dt] = dec
     except Exception:
         pass
 
@@ -427,6 +443,12 @@ def _get_lvbp_pitcher_game_logs(pitcher_id: int, season: int, phase: str = "all"
                 else:
                     is_start = bool(row.get("is_starter", False) or row.get("games_started", 0) > 0)
 
+                dec = (
+                    decision_map.get(gid)
+                    or decision_map.get(g_date)
+                    or ("W" if (row.get("wins") or 0) > 0 else ("L" if (row.get("losses") or 0) > 0 else ("SV" if (row.get("saves") or 0) > 0 else "")))
+                )
+
                 logs.append({
                     "game_pk": gid,
                     "date": g_date,
@@ -445,7 +467,7 @@ def _get_lvbp_pitcher_game_logs(pitcher_id: int, season: int, phase: str = "all"
                     "pitches": pitches,
                     "strikes": strikes,
                     "era": str(row.get("era") or "0.00"),
-                    "decision": "W" if row.get("wins", 0) > 0 else ("L" if row.get("losses", 0) > 0 else ("SV" if row.get("saves", 0) > 0 else "")),
+                    "decision": dec,
                     "league": "LVBP",
                 })
             if logs:
@@ -522,7 +544,11 @@ def _get_lvbp_pitcher_game_logs(pitcher_id: int, season: int, phase: str = "all"
                             "pitches": pitches,
                             "strikes": strikes,
                             "era": str(row.get("era", "0.00")),
-                            "decision": "W" if row.get("wins", 0) > 0 else ("L" if row.get("losses", 0) > 0 else ("SV" if row.get("saves", 0) > 0 else "")),
+                            "decision": (
+                                decision_map.get(gid)
+                                or decision_map.get(g_date)
+                                or ("W" if (row.get("wins") or 0) > 0 else ("L" if (row.get("losses") or 0) > 0 else ("SV" if (row.get("saves") or 0) > 0 else "")))
+                            ),
                             "league": "LVBP",
                         })
             if logs:
@@ -571,15 +597,82 @@ def _get_lvbp_pitcher_game_logs(pitcher_id: int, season: int, phase: str = "all"
 
 def _parse_decision(stat: dict) -> str:
     """Extrae la decisión W, L, SV o HLD de una salida."""
-    if stat.get("wins", 0) > 0:
+    if (stat.get("wins") or 0) > 0:
         return "W"
-    if stat.get("losses", 0) > 0:
+    if (stat.get("losses") or 0) > 0:
         return "L"
-    if stat.get("saves", 0) > 0:
+    if (stat.get("saves") or 0) > 0:
         return "SV"
-    if stat.get("holds", 0) > 0:
+    if (stat.get("holds") or 0) > 0:
         return "HLD"
     return ""
+
+
+def _get_mexico_pitcher_game_logs(pitcher_id: int, season: int, phase: str = "all") -> List[Dict[str, Any]]:
+    """
+    Obtiene las salidas del lanzador en la Liga Mexicana de Béisbol (LMB - Verano).
+    sportId=23, leagueId=125 vía MLB Stats API.
+    """
+    url = (
+        f"https://statsapi.mlb.com/api/v1/people/{pitcher_id}/stats"
+        f"?stats=gameLog&group=pitching&season={season}&sportId=23&gameType=R,F,D,L,W,P"
+    )
+    logs: List[Dict[str, Any]] = []
+    try:
+        req = urllib.request.Request(url, headers=HEADERS)
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            stats = data.get("stats", [])
+            if stats:
+                splits = stats[0].get("splits", [])
+                for s in splits:
+                    game = s.get("game", {})
+                    stat = s.get("stat", {})
+                    team = s.get("team", {}).get("name", "Liga Mexicana")
+                    opp = s.get("opponent", {}).get("name", "Rival")
+                    date_str = s.get("date", "")
+                    gpk = game.get("gamePk", 0)
+                    g_type = s.get("gameType") or "R"
+
+                    # Filtrar por fase si no es 'all'
+                    if phase and phase != "all":
+                        if phase == "R" and g_type != "R":
+                            continue
+                        elif phase in ("P", "L", "F") and g_type not in ("P", "L", "F", "D", "W") and g_type != phase:
+                            continue
+
+                    is_start = stat.get("gamesStarted", 0) > 0
+                    p_cnt = int(stat.get("numberOfPitches", 0) or 0)
+                    s_cnt = int(stat.get("strikes", 0) or 0)
+                    dec = _parse_decision(stat)
+
+                    logs.append({
+                        "game_pk": gpk,
+                        "date": date_str,
+                        "opponent": opp,
+                        "team": team,
+                        "is_starter": is_start,
+                        "role": "Abridor" if is_start else "Relevista",
+                        "game_type": g_type,
+                        "phase": g_type,
+                        "ip": stat.get("inningsPitched", "0.0"),
+                        "h": stat.get("hits", 0),
+                        "r": stat.get("runs", 0),
+                        "er": stat.get("earnedRuns", 0),
+                        "bb": stat.get("baseOnBalls", 0),
+                        "so": stat.get("strikeOuts", 0),
+                        "hr": stat.get("homeRuns", 0),
+                        "pitches": p_cnt,
+                        "strikes": s_cnt,
+                        "era": stat.get("era", "0.00"),
+                        "decision": dec,
+                        "league": "México",
+                    })
+    except Exception:
+        pass
+
+    logs.sort(key=lambda x: x["date"], reverse=True)
+    return logs
 
 
 # ── 3. Extracción y Parseo de Pitcheos (Savant & Gameday) ──────────────────────
@@ -688,8 +781,9 @@ def get_game_pitch_data(game_pk: int, pitcher_id: int, is_lvbp: bool = False) ->
     # 4. Splits LHB vs RHB
     splits_platoon = _build_platoon_splits(parsed_pitches)
 
-    # Detectar rol abridor / relevista desde el boxscore oficial
+    # Detectar rol abridor / relevista y decisión oficial desde el boxscore oficial
     is_starter = False
+    decision = ""
     try:
         boxscore = data.get("liveData", {}).get("boxscore", {})
         teams_box = boxscore.get("teams", {})
@@ -703,6 +797,18 @@ def get_game_pitch_data(game_pk: int, pitcher_id: int, is_lvbp: bool = False) ->
                 if p_obj.get("stats", {}).get("pitching", {}).get("gamesStarted", 0) > 0:
                     is_starter = True
                     break
+
+        decisions_dict = data.get("liveData", {}).get("decisions", {})
+        if decisions_dict.get("winner", {}).get("id") == pitcher_id:
+            decision = "W"
+        elif decisions_dict.get("loser", {}).get("id") == pitcher_id:
+            decision = "L"
+        elif decisions_dict.get("save", {}).get("id") == pitcher_id:
+            decision = "SV"
+        else:
+            holds = [h.get("id") for h in decisions_dict.get("holds", []) if isinstance(h, dict)]
+            if pitcher_id in holds:
+                decision = "HLD"
     except Exception:
         pass
 
@@ -711,6 +817,7 @@ def get_game_pitch_data(game_pk: int, pitcher_id: int, is_lvbp: bool = False) ->
         "pitcher_id": pitcher_id,
         "is_starter": is_starter,
         "role": "Abridor" if is_starter else "Relevista",
+        "decision": decision,
         "total_pitches": len(parsed_pitches),
         "has_statcast": has_statcast,
         "statcast_table": statcast_table,
