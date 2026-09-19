@@ -289,7 +289,7 @@ def controls_bar() -> rx.Component:
             rx.hstack(
                 rx.text("Temporada:", size="2", font_weight="700", color=TEXT_MUTED),
                 rx.select(
-                    ["2025", "2024", "2023", "2022"],
+                    PitchingState.available_seasons,
                     value=PitchingState.pitcher_season,
                     on_change=PitchingState.set_pitcher_season,
                     size="2",

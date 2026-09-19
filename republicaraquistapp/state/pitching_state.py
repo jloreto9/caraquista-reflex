@@ -94,8 +94,8 @@ class PitchingState(AppState):
     active_branch: str = "lvbp"
 
     # ── Salidas y Temporada ─────────────────────────────────────────────────
-    pitcher_season: str = "2025"
-    available_seasons: List[str] = ["2025", "2024", "2023", "2022"]
+    pitcher_season: str = "2026"
+    available_seasons: List[str] = ["2026", "2025", "2024", "2023", "2022"]
     selected_phase: str = "all"
     selected_phase_label: str = "Todas las Fases"
     available_phases: List[str] = ["Todas las Fases", "Temporada Regular", "Round Robin", "Serie Final"]
@@ -328,7 +328,7 @@ class PitchingState(AppState):
             try:
                 s_int = int(self.pitcher_season)
             except (ValueError, TypeError):
-                s_int = 2025
+                s_int = 2026
             logs = get_pitcher_game_logs(
                 p_id,
                 s_int,
@@ -339,21 +339,23 @@ class PitchingState(AppState):
 
             # Auto-detección inteligente: si la temporada actual no tiene salidas registradas,
             # buscar en las temporadas históricas disponibles y fijar la primera con datos.
+            effective_season = s_int
             if not logs and self.selected_phase == "all":
-                for alt_s in [2025, 2024, 2023, 2022]:
-                    if alt_s != s_int:
-                        alt_logs = get_pitcher_game_logs(
-                            p_id,
-                            alt_s,
-                            is_lvbp=is_lvbp,
-                            branch=self.active_branch,
-                            phase="all",
-                        )
-                        if alt_logs:
-                            s_int = alt_s
+                for alt_s in [s for s in [2026, 2025, 2024, 2023, 2022] if s != s_int]:
+                    alt_logs = get_pitcher_game_logs(
+                        p_id,
+                        alt_s,
+                        is_lvbp=is_lvbp,
+                        branch=self.active_branch,
+                        phase="all",
+                    )
+                    if alt_logs:
+                        logs = alt_logs
+                        effective_season = alt_s
+                        # Si no es LVBP 2026 (que aún no inicia), sincronizar pitcher_season
+                        if not (self.active_branch == "lvbp" and self.pitcher_season == "2026"):
                             self.pitcher_season = str(alt_s)
-                            logs = alt_logs
-                            break
+                        break
 
             self.game_logs = logs
 
@@ -614,7 +616,7 @@ class PitchingState(AppState):
             try:
                 s_int = int(self.pitcher_season)
             except (ValueError, TypeError):
-                s_int = 2024
+                s_int = 2026
 
             is_lvbp = (self.active_branch == "lvbp")
             is_mexico = (self.active_branch == "mexico")

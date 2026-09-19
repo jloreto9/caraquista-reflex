@@ -1375,3 +1375,77 @@ def get_pitcher_bio_data(pitcher_id: int) -> Dict[str, Any]:
             "team_id": 0,
         }
 
+
+def get_available_seasons() -> List[int]:
+    """Retorna las temporadas canónicas disponibles para análisis."""
+    return [2026, 2025, 2024, 2023, 2022]
+
+
+def get_pitcher_season_statcast_df(pitcher_id: int, season: int = 2026) -> pd.DataFrame:
+    """Descarga lanzamientos Statcast para un lanzador en una temporada completa."""
+    return get_statcast_pitcher_df(pitcher_id, season=season, mode="season")
+
+
+def get_pitch_analysis_for_df(df_sc: pd.DataFrame) -> Dict[str, Any]:
+    """Calcula el resumen de análisis de lanzamientos para un DataFrame Statcast."""
+    if df_sc is None or df_sc.empty:
+        return {"total_pitches": 0, "statcast_table": [], "pitches": [], "pbp_kpis": {}}
+    pitches_list = []
+    for _, row in df_sc.iterrows():
+        p_name = row.get("pitch_name") or "4-Seam Fastball"
+        speed = row.get("release_speed")
+        spin = row.get("release_spin_rate")
+        pfx_x = row.get("pfx_x")
+        pfx_z = row.get("pfx_z")
+        try:
+            val_x = float(pfx_x) if pfx_x is not None and not pd.isna(pfx_x) else 0.0
+            hb = val_x if abs(val_x) > 6 else val_x * 12.0
+        except Exception:
+            hb = 0.0
+        try:
+            val_z = float(pfx_z) if pfx_z is not None and not pd.isna(pfx_z) else 0.0
+            ivb = val_z if abs(val_z) > 6 else val_z * 12.0
+        except Exception:
+            ivb = 0.0
+
+        is_whiff = bool(row.get("whiff", False))
+        desc = str(row.get("description", "")).lower()
+        is_called = "called_strike" in desc
+        is_foul = "foul" in desc
+        is_in_play = "in_play" in desc or "hit_into_play" in desc
+        in_z = bool(row.get("in_zone", False))
+        px = row.get("plate_x")
+        pz = row.get("plate_z")
+
+        pitches_list.append({
+            "pitch_name": p_name,
+            "speed": float(speed) if speed is not None and not pd.isna(speed) else None,
+            "spin": int(spin) if spin is not None and not pd.isna(spin) else None,
+            "ivb": round(ivb, 1),
+            "hb": round(hb, 1),
+            "is_whiff": is_whiff,
+            "is_called": is_called,
+            "is_foul": is_foul,
+            "is_in_play": is_in_play,
+            "is_zone": in_z,
+            "plate_x": float(px) if px is not None and not pd.isna(px) else 0.0,
+            "plate_z": float(pz) if pz is not None and not pd.isna(pz) else 2.5,
+        })
+    table = _build_statcast_table(pitches_list)
+    tot = len(pitches_list)
+    whiffs = sum(1 for p in pitches_list if p.get("is_whiff"))
+    swings = sum(1 for p in pitches_list if p.get("is_whiff") or p.get("is_foul") or p.get("is_in_play"))
+    called = sum(1 for p in pitches_list if p.get("is_called"))
+    csw = whiffs + called
+    csw_pct = f"{(csw / tot * 100):.1f}%" if tot > 0 else "0.0%"
+    whiff_pct = f"{(whiffs / swings * 100):.1f}%" if swings > 0 else "0.0%"
+    return {
+        "total_pitches": tot,
+        "statcast_table": table,
+        "pitches": pitches_list,
+        "pbp_kpis": {
+            "csw_pct": csw_pct,
+            "whiff_pct": whiff_pct,
+        }
+    }
+
