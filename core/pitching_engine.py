@@ -55,6 +55,17 @@ HEADERS = {
 }
 
 
+def _safe_int(val: Any) -> int:
+    """Convierte cualquier valor a int de forma defensiva evitando TypeErrors."""
+    try:
+        if val is None:
+            return 0
+        return int(float(val))
+    except (ValueError, TypeError):
+        return 0
+
+
+
 # ── 1. Búsqueda Universal de Lanzadores y Resolución por ID ───────────────────
 
 @cache_ttl(ttl_seconds=7200)
@@ -272,7 +283,7 @@ def search_pitchers(query: str) -> List[Dict[str, Any]]:
         })
 
     # Ordenar: primero lanzadores con historial LVBP, luego lanzadores en general
-    results.sort(key=lambda x: (not x["has_lvbp_history"], not x["has_caracas_history"], x["position"] != "P", x["name"]))
+    results.sort(key=lambda x: (not x.get("has_lvbp_history"), not x.get("has_caracas_history"), x.get("position") != "P", str(x.get("name") or "")))
     return results[:15]
 
 
@@ -281,16 +292,36 @@ def search_pitchers(query: str) -> List[Dict[str, Any]]:
 @cache_ttl(ttl_seconds=1800)
 def get_pitcher_game_logs(
     pitcher_id: int,
-    season: int,
+    season: int = 2025,
     is_lvbp: bool = False,
     branch: str = "lvbp",
     phase: str = "all",
+    *args,
+    **kwargs
 ) -> List[Dict[str, Any]]:
     """
     Obtiene las salidas (Game Logs) del lanzador para la temporada especificada.
     Si branch == "mexico": obtiene salidas de la Liga Mexicana de Verano (LMB, sportId=23).
     Si is_lvbp o branch == "lvbp": busca en juegos de LVBP (con opción de filtrar por fase 'R', 'L', 'F', 'all'); de lo contrario en MLB y MiLB.
+    Mantiene compatibilidad defensiva total ante cualquier orden o kwargs pasados.
     """
+    # Normalización defensiva de kwargs y parámetros
+    if "branch" in kwargs:
+        branch = kwargs["branch"]
+    elif not branch and is_lvbp:
+        branch = "lvbp"
+    if "phase" in kwargs:
+        phase = kwargs["phase"]
+    if "is_lvbp" in kwargs:
+        is_lvbp = kwargs["is_lvbp"]
+    if "season" in kwargs:
+        season = kwargs["season"]
+
+    # Detección defensiva: si el 4to argumento posicional era phase (ej: "all", "R", "L", "F", "P")
+    if branch in ("all", "R", "L", "F", "P", "D", "W") and phase == "all":
+        phase = branch
+        branch = "lvbp" if is_lvbp else "mlb"
+
     if branch == "mexico":
         return _get_mexico_pitcher_game_logs(pitcher_id, season, phase=phase)
     if is_lvbp or branch == "lvbp":
@@ -313,9 +344,9 @@ def get_pitcher_game_logs(
                     game = s.get("game", {})
                     stat = s.get("stat", {})
                     opp = s.get("opponent", {}).get("name", "Rival")
-                    date_str = s.get("date", "")
+                    date_str = str(s.get("date") or "")
                     gpk = game.get("gamePk", 0)
-                    is_start = stat.get("gamesStarted", 0) > 0
+                    is_start = _safe_int(stat.get("gamesStarted")) > 0
 
                     logs.append({
                         "game_pk": gpk,
@@ -340,7 +371,7 @@ def get_pitcher_game_logs(
         pass
 
     # Ordenar de más reciente a más antiguo
-    logs.sort(key=lambda x: x["date"], reverse=True)
+    logs.sort(key=lambda x: str(x.get("date") or ""), reverse=True)
     return logs
 
 
@@ -446,12 +477,12 @@ def _get_lvbp_pitcher_game_logs(pitcher_id: int, season: int, phase: str = "all"
                 dec = (
                     decision_map.get(gid)
                     or decision_map.get(g_date)
-                    or ("W" if (row.get("wins") or 0) > 0 else ("L" if (row.get("losses") or 0) > 0 else ("SV" if (row.get("saves") or 0) > 0 else "")))
+                    or ("W" if _safe_int(row.get("wins")) > 0 else ("L" if _safe_int(row.get("losses")) > 0 else ("SV" if _safe_int(row.get("saves")) > 0 else "")))
                 )
 
                 logs.append({
                     "game_pk": gid,
-                    "date": g_date,
+                    "date": str(g_date or ""),
                     "opponent": opp_name,
                     "is_starter": is_start,
                     "role": "Abridor" if is_start else "Relevista",
@@ -471,7 +502,7 @@ def _get_lvbp_pitcher_game_logs(pitcher_id: int, season: int, phase: str = "all"
                     "league": "LVBP",
                 })
             if logs:
-                logs.sort(key=lambda x: x["date"], reverse=True)
+                logs.sort(key=lambda x: str(x.get("date") or ""), reverse=True)
                 return logs
     except Exception:
         pass
@@ -547,12 +578,12 @@ def _get_lvbp_pitcher_game_logs(pitcher_id: int, season: int, phase: str = "all"
                             "decision": (
                                 decision_map.get(gid)
                                 or decision_map.get(g_date)
-                                or ("W" if (row.get("wins") or 0) > 0 else ("L" if (row.get("losses") or 0) > 0 else ("SV" if (row.get("saves") or 0) > 0 else "")))
+                                or ("W" if _safe_int(row.get("wins")) > 0 else ("L" if _safe_int(row.get("losses")) > 0 else ("SV" if _safe_int(row.get("saves")) > 0 else "")))
                             ),
                             "league": "LVBP",
                         })
             if logs:
-                logs.sort(key=lambda x: x["date"], reverse=True)
+                logs.sort(key=lambda x: str(x.get("date") or ""), reverse=True)
                 return logs
         except Exception:
             pass
@@ -563,12 +594,12 @@ def _get_lvbp_pitcher_game_logs(pitcher_id: int, season: int, phase: str = "all"
             game = s.get("game", {})
             stat = s.get("stat", {})
             opp = s.get("opponent", {}).get("name", "Rival")
-            date_str = s.get("date", "")
+            date_str = str(s.get("date") or "")
             gpk = game.get("gamePk", 0)
             g_type = s.get("gameType") or "R"
             if phase and phase != "all" and g_type != phase:
                 continue
-            is_start = stat.get("gamesStarted", 0) > 0
+            is_start = _safe_int(stat.get("gamesStarted")) > 0
             logs.append({
                 "game_pk": gpk,
                 "date": date_str,
@@ -591,19 +622,21 @@ def _get_lvbp_pitcher_game_logs(pitcher_id: int, season: int, phase: str = "all"
                 "league": "LVBP",
             })
 
-    logs.sort(key=lambda x: x["date"], reverse=True)
+    logs.sort(key=lambda x: str(x.get("date") or ""), reverse=True)
     return logs
 
 
-def _parse_decision(stat: dict) -> str:
-    """Extrae la decisión W, L, SV o HLD de una salida."""
-    if (stat.get("wins") or 0) > 0:
+def _parse_decision(stat: Optional[dict]) -> str:
+    """Extrae la decisión W, L, SV o HLD de una salida de manera defensiva."""
+    if not isinstance(stat, dict):
+        return ""
+    if _safe_int(stat.get("wins")) > 0:
         return "W"
-    if (stat.get("losses") or 0) > 0:
+    if _safe_int(stat.get("losses")) > 0:
         return "L"
-    if (stat.get("saves") or 0) > 0:
+    if _safe_int(stat.get("saves")) > 0:
         return "SV"
-    if (stat.get("holds") or 0) > 0:
+    if _safe_int(stat.get("holds")) > 0:
         return "HLD"
     return ""
 
@@ -630,7 +663,7 @@ def _get_mexico_pitcher_game_logs(pitcher_id: int, season: int, phase: str = "al
                     stat = s.get("stat", {})
                     team = s.get("team", {}).get("name", "Liga Mexicana")
                     opp = s.get("opponent", {}).get("name", "Rival")
-                    date_str = s.get("date", "")
+                    date_str = str(s.get("date") or "")
                     gpk = game.get("gamePk", 0)
                     g_type = s.get("gameType") or "R"
 
@@ -641,7 +674,7 @@ def _get_mexico_pitcher_game_logs(pitcher_id: int, season: int, phase: str = "al
                         elif phase in ("P", "L", "F") and g_type not in ("P", "L", "F", "D", "W") and g_type != phase:
                             continue
 
-                    is_start = stat.get("gamesStarted", 0) > 0
+                    is_start = _safe_int(stat.get("gamesStarted")) > 0
                     p_cnt = int(stat.get("numberOfPitches", 0) or 0)
                     s_cnt = int(stat.get("strikes", 0) or 0)
                     dec = _parse_decision(stat)
@@ -671,7 +704,7 @@ def _get_mexico_pitcher_game_logs(pitcher_id: int, season: int, phase: str = "al
     except Exception:
         pass
 
-    logs.sort(key=lambda x: x["date"], reverse=True)
+    logs.sort(key=lambda x: str(x.get("date") or ""), reverse=True)
     return logs
 
 
