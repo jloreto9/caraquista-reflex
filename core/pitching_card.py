@@ -782,6 +782,7 @@ def build_lvbp_matplotlib_summary(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     game_logs: Optional[List[Dict[str, Any]]] = None,
+    phase: str = "all",
 ) -> bytes:
     """
     Construye la tarjeta Matplotlib 20x20 adaptada para Leones del Caracas.
@@ -794,33 +795,45 @@ def build_lvbp_matplotlib_summary(
     if mode in ("season", "range"):
         logs = list(game_logs or [])
         team_label = pitcher_info.get("lvbp_team_name") or pitcher_info.get("team") or "Leones del Caracas"
+
+        phase_labels = {
+            "R": "Temporada Regular",
+            "L": "Round Robin",
+            "F": "Serie Final",
+            "all": "Temporada Completa",
+        }
+        phase_txt = phase_labels.get(phase, "Temporada Completa")
+
+        if phase and phase != "all":
+            logs = [g for g in logs if g.get("game_type") == phase or g.get("phase") == phase]
+
         if mode == "range":
             s_d = str(start_date) if start_date else f"{season}-10-01"
             e_d = str(end_date) if end_date else f"{season}-12-31"
             logs = [g for g in logs if s_d <= str(g.get("date", "")) <= e_d]
-            sub1 = "LVBP • Resumen por Rango de Fechas"
+            sub1 = f"LVBP • Resumen por Rango ({phase_txt})"
             sub2 = f"{team_label} | {s_d} al {e_d}"
         else:
-            sub1 = "LVBP • Resumen de Temporada Completa"
+            sub1 = f"LVBP • {phase_txt}"
             sub2 = f"{team_label} | Temporada {season}"
 
         if not logs:
             fig, ax = plt.subplots(figsize=(10, 10), facecolor='white')
             ax.axis('off')
-            ax.text(0.5, 0.5, "No se encontraron salidas registradas para este período.", ha='center', va='center', fontsize=20, color='#64748B')
+            ax.text(0.5, 0.5, f"No se encontraron salidas registradas para {phase_txt.lower()}.", ha='center', va='center', fontsize=20, color='#64748B')
             buf = io.BytesIO()
             fig.savefig(buf, format='png', dpi=dpi, bbox_inches='tight')
             plt.close(fig)
             return buf.getvalue()
 
-        # Enriquecer logs con telemetría pitcheo a pitcheo si falta el conteo de lanzamientos
-        needs_pbp = any(not g.get('pitches') or not g.get('strikes') for g in logs)
+        # Enriquecer logs con telemetría pitcheo a pitcheo para Whiff% y CSW% si faltan
+        needs_pbp = any(g.get('csw_pct') is None or g.get('whiff_pct') is None or not g.get('pitches') for g in logs)
         if needs_pbp and pitcher_info.get("id"):
             from concurrent.futures import ThreadPoolExecutor
             p_id_int = pitcher_info["id"]
             def _enrich_log(g):
                 gpk = g.get('game_pk')
-                if gpk and (not g.get('pitches') or not g.get('strikes')):
+                if gpk and (g.get('csw_pct') is None or g.get('whiff_pct') is None or not g.get('pitches')):
                     try:
                         try:
                             from core.pitching_engine import get_game_pitch_data
@@ -828,8 +841,8 @@ def build_lvbp_matplotlib_summary(
                             from utils.pitching_engine import get_game_pitch_data
                         p_data = get_game_pitch_data(gpk, p_id_int, is_lvbp=True)
                         kpis = p_data.get('pbp_kpis', {})
-                        tot_p = p_data.get('total_pitches', 0)
-                        strk = kpis.get('strikes', int(tot_p * 0.62))
+                        tot_p = g.get('pitches') or p_data.get('total_pitches', 0)
+                        strk = g.get('strikes') or kpis.get('strikes') or int(tot_p * 0.62)
                         csw = float(str(kpis.get('csw_pct', '0%')).replace('%', ''))
                         whiff = float(str(kpis.get('whiff_pct', '0%')).replace('%', ''))
                         g['pitches'] = tot_p
@@ -1220,6 +1233,7 @@ def build_pitching_summary_card(
     df_statcast: Optional[pd.DataFrame] = None,
     df: Optional[pd.DataFrame] = None,
     dpi: int = 150,
+    phase: str = "all",
     **kwargs,
 ) -> bytes:
     """
@@ -1243,6 +1257,7 @@ def build_pitching_summary_card(
             start_date=start_date,
             end_date=end_date,
             game_logs=game_logs,
+            phase=phase,
         )
     else:
         if statcast_df is not None and not statcast_df.empty:

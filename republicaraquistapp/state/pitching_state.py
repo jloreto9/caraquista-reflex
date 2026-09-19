@@ -96,6 +96,9 @@ class PitchingState(AppState):
     # ── Salidas y Temporada ─────────────────────────────────────────────────
     pitcher_season: str = "2025"
     available_seasons: List[str] = ["2025", "2024", "2023", "2022"]
+    selected_phase: str = "all"
+    selected_phase_label: str = "Todas las Fases"
+    available_phases: List[str] = ["Todas las Fases", "Temporada Regular", "Round Robin", "Serie Final"]
     game_logs: List[Dict[str, Any]] = []
     game_log_options: List[str] = []
     selected_game_label: str = ""
@@ -215,8 +218,22 @@ class PitchingState(AppState):
         self.rendered_image_url = ""
         self.raw_card_bytes = b""
         self.time_mode = "game"
+        self.selected_phase = "all"
+        self.selected_phase_label = "Todas las Fases"
 
     # ── Manejadores de Salidas, Ramas y Modos Temporales ────────────────────
+
+    def set_selected_phase_label(self, label: str):
+        """Actualiza la fase de campeonato seleccionada y recarga salidas."""
+        self.selected_phase_label = label
+        phase_map = {
+            "Todas las Fases": "all",
+            "Temporada Regular": "R",
+            "Round Robin": "L",
+            "Serie Final": "F",
+        }
+        self.selected_phase = phase_map.get(label, "all")
+        self.load_pitcher_games()
 
     def set_active_branch(self, branch: str):
         """Cambia entre la rama MLB/MiLB (Statcast) y LVBP."""
@@ -305,14 +322,14 @@ class PitchingState(AppState):
                 s_int = int(self.pitcher_season)
             except (ValueError, TypeError):
                 s_int = 2025
-            logs = get_pitcher_game_logs(p_id, s_int, is_lvbp=is_lvbp)
+            logs = get_pitcher_game_logs(p_id, s_int, is_lvbp=is_lvbp, phase=self.selected_phase)
 
             # Auto-detección inteligente: si la temporada actual no tiene salidas registradas,
             # buscar en las temporadas históricas disponibles y fijar la primera con datos.
-            if not logs:
+            if not logs and self.selected_phase == "all":
                 for alt_s in [2025, 2024, 2023, 2022]:
                     if alt_s != s_int:
-                        alt_logs = get_pitcher_game_logs(p_id, alt_s, is_lvbp=is_lvbp)
+                        alt_logs = get_pitcher_game_logs(p_id, alt_s, is_lvbp=is_lvbp, phase="all")
                         if alt_logs:
                             s_int = alt_s
                             self.pitcher_season = str(alt_s)
@@ -322,7 +339,7 @@ class PitchingState(AppState):
             self.game_logs = logs
 
             opts = [
-                f"{g.get('date', '')} vs {g.get('opponent', '')} ({g.get('ip', 0)} IP, {g.get('so', 0)} K)"
+                f"{g.get('date', '')} vs {g.get('opponent', '')} ({g.get('ip', 0)} IP, {g.get('so', 0)} K, {g.get('pitches', 0)} P)"
                 for g in logs
             ]
             self.game_log_options = opts
@@ -593,6 +610,7 @@ class PitchingState(AppState):
                     start_date=self.range_start_date,
                     end_date=self.range_end_date,
                     game_logs=self.game_logs,
+                    phase=self.selected_phase,
                 )
             else:
                 pitcher_info = dict(self.selected_pitcher)

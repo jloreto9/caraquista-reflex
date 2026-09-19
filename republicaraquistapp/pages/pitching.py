@@ -289,6 +289,23 @@ def controls_bar() -> rx.Component:
                     color_scheme="amber",
                     width="100px",
                 ),
+                # Selector de Fase (solo visible en LVBP)
+                rx.cond(
+                    PitchingState.active_branch == "lvbp",
+                    rx.hstack(
+                        rx.text("Fase:", size="2", font_weight="700", color=TEXT_MUTED),
+                        rx.select(
+                            PitchingState.available_phases,
+                            value=PitchingState.selected_phase_label,
+                            on_change=PitchingState.set_selected_phase_label,
+                            size="2",
+                            color_scheme="amber",
+                            width="165px",
+                        ),
+                        align="center",
+                        spacing="2",
+                    ),
+                ),
                 # Modo Salida Individual
                 rx.cond(
                     PitchingState.time_mode == "game",
@@ -301,7 +318,7 @@ def controls_bar() -> rx.Component:
                             on_change=PitchingState.set_selected_game_by_label,
                             size="2",
                             color_scheme="amber",
-                            max_width="340px",
+                            max_width="380px",
                         ),
                         align="center",
                         spacing="2",
